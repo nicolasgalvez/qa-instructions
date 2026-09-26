@@ -6,3 +6,5 @@ qa-runs/
 qa-steps-out/
 playwright-report/
 test-results/
+.claude/settings.local.json
+.playwright-mcp/
