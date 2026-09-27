@@ -76,6 +76,15 @@ The second element of the reporter entry in `playwright.config.ts`.
 
 Where bundles are written, relative to the directory you run Playwright from. Each test gets `<outputDir>/<file>--<test title>/` (with the project, then the line, added only when two tests would otherwise share a directory). A retried test keeps its last attempt.
 
+Every bundle directory the reporter writes holds a `.qa-instructions.json` marker. After a full run, the reporter removes the marked directories that run did not write, such as those of renamed or deleted tests, so `outputDir` holds only that run's QA Instructions. It never removes anything without the marker, and nothing outside `outputDir`.
+
+A partial run removes nothing, so results for tests it didn't run are kept. A run counts as full only when it:
+
+- was started as `playwright test` with no test filters: no file or `file:line` arguments, and no `--grep`, `--grep-invert`, `--project`, `--last-failed`, `--only-changed`, `--shard`, `--list`, or `--ui`;
+- finished rather than being interrupted or timing out, and, with `maxFailures` set, passed.
+
+An unrecognized command-line argument also counts as a partial run. A bundle whose test the `select` option now leaves out is kept. `test.only` narrows a run in a way reporters can't see, so a full run with `test.only` removes the other tests' bundles.
+
 ```typescript
 {
   outputDir: 'artifacts/qa-runs';

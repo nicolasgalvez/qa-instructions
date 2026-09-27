@@ -56,6 +56,12 @@ export {
 export { BundleDirNamer, type BundleIdentity } from './bundle/dir-namer.js';
 export { createBundleBuilder, type BundleBuilder } from './bundle/builder.js';
 export {
+  BundleOutputDir,
+  type BundleOwner,
+  type OwnedBundleDir,
+} from './bundle/output-dir.js';
+export { StaleBundlePolicy, type RunCoverage } from './bundle/stale-policy.js';
+export {
   writeBundle,
   readBundle,
   readBundleAssets,
