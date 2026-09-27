@@ -9,6 +9,6 @@
   "devDependencies": {
     "@qa-instructions/cli": "workspace:*",
     "@qa-instructions/playwright": "workspace:*",
-    "@playwright/test": "^1.51.0"
+    "@playwright/test": "^1.63.0"
   }
 }

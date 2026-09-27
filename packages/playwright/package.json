@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./dist/index.js",
-    "./collector": "./dist/reporter/collector.js"
+    "./collector": "./dist/reporter/collector.js",
+    "./reporter": "./dist/reporter/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
@@ -17,7 +18,7 @@
     "@playwright/test": ">=1.51.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.51.0",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"
   },

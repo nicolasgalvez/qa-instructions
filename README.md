@@ -18,13 +18,30 @@ See [docs/design.md](./docs/design.md) for the full spec.
 
 ## Packages
 
-| Package                       | Role                                  |
-| ----------------------------- | ------------------------------------- |
-| `@qa-instructions/core`       | Bundle model, builder, I/O, renderers |
-| `@qa-instructions/playwright` | `qa` fixture + collector reporter     |
-| `@qa-instructions/cli`        | `qa-instructions render` command      |
+| Package                       | Role                                                                             |
+| ----------------------------- | -------------------------------------------------------------------------------- |
+| `@qa-instructions/core`       | Runner-independent core: test event port, QA Steps, bundle model, I/O, renderers |
+| `@qa-instructions/playwright` | Reporter adapter (plus the legacy `qa` fixture + collector)                      |
+| `@qa-instructions/cli`        | `qa-instructions render` command                                                 |
 
-## Usage
+## Usage: derive QA Steps from existing tests
+
+Add the reporter to `playwright.config.ts`. Tests are not changed.
+
+```typescript
+export default defineConfig({
+  reporter: [
+    ['list'],
+    ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs' }],
+  ],
+});
+```
+
+Each test's browser Actions (opening a URL, clicking, typing, pressing keys, choosing options) become numbered QA Steps, and the `expect` checks that follow an Action become its Expected Result. Waits, scripts, value reads, and API requests are left out. `@playwright/test` is a peer dependency used for types only, so the package always runs against your project's own Playwright.
+
+Render as in step 3 below. See `examples/derived-steps` for a full example.
+
+## Legacy usage: the `qa` fixture
 
 ### 1. Write a test
 
@@ -72,20 +89,21 @@ Paste `qa-steps-out/*.txt` into your ticket. Screenshots stay in `qa-runs/` and 
 
 ## CI
 
-E2E on `main` runs the verification example (local fixture site + golden checks):
+E2E on `main` runs the verification and derived-steps examples (local fixture site + golden checks):
 
 ```bash
-pnpm --filter @qa-instructions/example-verification e2e
+pnpm verify
 ```
 
 Unit CI runs `packages/*` tests only; Playwright browser tests stay in the E2E workflow.
 
 ## Examples
 
-| Example                 | Purpose                                                        |
-| ----------------------- | -------------------------------------------------------------- |
-| `examples/verification` | Deterministic capture/render e2e with golden screenshot probes |
-| `examples/basic`        | Optional smoke against playwright.dev                          |
+| Example                  | Purpose                                                        |
+| ------------------------ | -------------------------------------------------------------- |
+| `examples/verification`  | Deterministic capture/render e2e with golden screenshot probes |
+| `examples/derived-steps` | Unmodified test + reporter → rendered QA Steps, golden text    |
+| `examples/basic`         | Optional smoke against playwright.dev                          |
 
 ```bash
 # Full pipeline verification (recommended)
