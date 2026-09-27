@@ -116,6 +116,7 @@ for (const recording of [
   'sign-in-with-good-credentials',
   'read-the-faq',
   'subscribe-to-the-newsletter',
+  'add-credits-to-the-cart',
 ]) {
   test(`Playwright 1.56 yields the same QA Steps as 1.63: ${recording}`, async () => {
     assert.deepEqual(
@@ -124,6 +125,33 @@ for (const recording of [
     );
   });
 }
+
+test("checks titled with the author's message are Expected Results named by the message", async () => {
+  const bundle = await bundleFrom('1.63', 'add-credits-to-the-cart');
+  assert.deepEqual(
+    bundle.steps.map(({ action, expected }) => ({ action, expected })),
+    [
+      {
+        action: 'Open http://127.0.0.1:4321/shop',
+        expected: '**purchase form for 1174** is visible',
+      },
+      {
+        action:
+          'Type **3** into the **input[name="download_quantity"]** element',
+        expected: undefined,
+      },
+      {
+        action: 'Click the **Purchase** button',
+        expected: '**Added to cart** is visible',
+      },
+      {
+        action: 'Open http://127.0.0.1:4321/cart',
+        expected:
+          '**cart line-item quantity** is **3**; **cart subtotal (qty × unit price)** is **15**',
+      },
+    ],
+  );
+});
 
 test('Playwright 1.53 check titles (matcher alone) give the same QA Steps', async () => {
   assert.deepEqual(

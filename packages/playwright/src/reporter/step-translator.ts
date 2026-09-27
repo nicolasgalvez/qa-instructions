@@ -2,6 +2,7 @@ import type { TestCase, TestResult, TestStep } from '@playwright/test/reporter';
 import type {
   ActionEvent,
   CheckEvent,
+  ElementTarget,
   TestEvent,
   TestStartEvent,
 } from '@qa-instructions/core';
@@ -14,6 +15,39 @@ import { StepTitleParser } from './step-title.js';
 
 /** Matchers whose subject is the page rather than an element. */
 const PAGE_MATCHERS = new Set(['toHaveURL', 'toHaveTitle']);
+
+/**
+ * Matchers Playwright only has for locators, so their subject is an element
+ * even when the source names it by a variable (`expect(form).toBeVisible()`).
+ */
+const LOCATOR_MATCHERS = new Set([
+  'toBeAttached',
+  'toBeChecked',
+  'toBeDisabled',
+  'toBeEditable',
+  'toBeEmpty',
+  'toBeEnabled',
+  'toBeFocused',
+  'toBeHidden',
+  'toBeInViewport',
+  'toBeVisible',
+  'toContainClass',
+  'toContainText',
+  'toHaveAccessibleDescription',
+  'toHaveAccessibleErrorMessage',
+  'toHaveAccessibleName',
+  'toHaveAttribute',
+  'toHaveClass',
+  'toHaveCount',
+  'toHaveCSS',
+  'toHaveId',
+  'toHaveJSProperty',
+  'toHaveRole',
+  'toHaveText',
+  'toHaveValue',
+  'toHaveValues',
+  'toMatchAriaSnapshot',
+]);
 
 /**
  * A check's title: `Expect "not toBeHidden"`. Playwright 1.53–1.54 write the
@@ -151,35 +185,66 @@ export class PlaywrightStepTranslator {
     };
   }
 
+  /**
+   * A check step. Its title names the matcher (`Expect "toBeVisible"`),
+   * unless the test gave the check a message (`expect(qty, 'cart
+   * quantity')`): then the title is that message, and the matcher is read
+   * from the source.
+   */
   private check(step: TestStep): CheckEvent | undefined {
-    const match = EXPECT_TITLE.exec(step.title);
-    if (!match) return undefined;
+    const titled = this.titledCheck(step.title);
+    const site = this.checkSite(step, titled === undefined);
+    const matcher = titled?.matcher ?? site?.matcher;
+    if (!matcher) return undefined;
 
-    const groups = match.groups ?? {};
-    const not = groups.not ?? groups.bareNot;
-    const matcher = groups.matcher ?? groups.bareMatcher;
-    const site = this.checkSite(step);
     const target = this.locators.parse(
-      this.locator(step) ?? groups.locator ?? site?.subject,
+      this.locator(step) ?? titled?.locator ?? site?.subject,
     );
     return {
       type: 'check',
       matcher,
-      negated: Boolean(not),
-      subject: target
-        ? 'element'
-        : PAGE_MATCHERS.has(matcher)
-          ? 'page'
-          : 'value',
+      negated: titled?.negated ?? site?.negated ?? false,
+      subject: this.checkSubject(matcher, target),
       target,
       expected: this.text(this.params(step).expected) ?? site?.expected,
+      ...(titled ? {} : { description: step.title }),
       failed: this.failed(step),
     };
   }
 
-  /** Before 1.63 a check step has no params: its subject and expected value are in the source. */
-  private checkSite(step: TestStep): CheckSite | undefined {
-    return step.params === undefined && step.location
+  /** The matcher, negation, and locator a check's title names, if it names them. */
+  private titledCheck(
+    title: string,
+  ): { matcher: string; negated: boolean; locator?: string } | undefined {
+    const groups = EXPECT_TITLE.exec(title)?.groups;
+    if (!groups) return undefined;
+    return {
+      matcher: groups.matcher ?? groups.bareMatcher,
+      negated: Boolean(groups.not ?? groups.bareNot),
+      locator: groups.locator,
+    };
+  }
+
+  private checkSubject(
+    matcher: string,
+    target: ElementTarget | undefined,
+  ): CheckEvent['subject'] {
+    if (target) return 'element';
+    if (PAGE_MATCHERS.has(matcher)) return 'page';
+    return LOCATOR_MATCHERS.has(matcher) ? 'element' : 'value';
+  }
+
+  /**
+   * The check as written in the source: read before 1.63, whose check steps
+   * have no params, and for a check titled with its message, whose matcher
+   * only the source names.
+   */
+  private checkSite(
+    step: TestStep,
+    messageTitled: boolean,
+  ): CheckSite | undefined {
+    const needed = step.params === undefined || messageTitled;
+    return needed && step.location
       ? this.callSites.readCheck(step.location)
       : undefined;
   }

@@ -63,6 +63,31 @@ const PAGE_CHECKS: Record<string, CheckWording> = {
 };
 
 /**
+ * Checks of a plain value, keyed by matcher; only worded when the author
+ * described the value and the expected value is known.
+ */
+const VALUE_CHECKS: Record<string, CheckWording> = {
+  toBe: { positive: 'is %v', negative: 'is not %v' },
+  toEqual: { positive: 'is %v', negative: 'is not %v' },
+  toStrictEqual: { positive: 'is %v', negative: 'is not %v' },
+  toBeCloseTo: { positive: 'is %v', negative: 'is not %v' },
+  toContain: { positive: 'contains %v', negative: 'does not contain %v' },
+  toBeGreaterThan: {
+    positive: 'is more than %v',
+    negative: 'is not more than %v',
+  },
+  toBeGreaterThanOrEqual: {
+    positive: 'is at least %v',
+    negative: 'is less than %v',
+  },
+  toBeLessThan: { positive: 'is less than %v', negative: 'is at least %v' },
+  toBeLessThanOrEqual: {
+    positive: 'is at most %v',
+    negative: 'is more than %v',
+  },
+};
+
+/**
  * Turns neutral Actions and checks into the plain-language sentences a
  * tester reads. Knows nothing about any test runner.
  */
@@ -151,7 +176,13 @@ export class StepPhraser {
    * can be joined. Undefined when a tester could not see what was checked.
    */
   check(event: CheckEvent): string | undefined {
-    if (event.subject === 'value') return undefined;
+    if (event.subject === 'value') {
+      const wording = VALUE_CHECKS[event.matcher];
+      if (!wording || !event.description || event.expected === undefined) {
+        return undefined;
+      }
+      return `${this.emphasize(event.description)} ${this.fill(wording, event)}`;
+    }
 
     if (event.subject === 'page') {
       const wording = PAGE_CHECKS[event.matcher];
@@ -160,11 +191,31 @@ export class StepPhraser {
     }
 
     const wording = ELEMENT_CHECKS[event.matcher];
-    if (!wording || !event.target) return undefined;
+    const subject = this.checkedElement(event);
+    if (!wording || !subject) return undefined;
     if (wording.positive.includes('%v') && event.expected === undefined) {
       return undefined;
     }
-    return `${this.target(event.target)} ${this.fill(wording, event)}`;
+    return `${subject} ${this.fill(wording, event)}`;
+  }
+
+  /**
+   * The checked element as a tester sees it: by its own readable name, else
+   * by the author's description of it, else by whatever identified it.
+   */
+  private checkedElement(event: CheckEvent): string | undefined {
+    const { target, description } = event;
+    if (description && !this.hasReadableName(target)) {
+      return this.emphasize(description);
+    }
+    return target && this.target(target);
+  }
+
+  /** Whether a tester could find the element from how the test named it. */
+  private hasReadableName(target: ElementTarget | undefined): boolean {
+    if (!target) return false;
+    if (target.by === 'role') return target.name !== undefined;
+    return target.by !== 'selector';
   }
 
   /** The element as a tester sees it, e.g. `the **Sign in** link`. */

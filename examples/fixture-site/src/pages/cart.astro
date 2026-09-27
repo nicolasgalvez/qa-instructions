@@ -1,0 +1,26 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Cart">
+  <h1>Cart</h1>
+  <table id="checkout_cart">
+    <tr>
+      <th>Item</th>
+      <th>Quantity</th>
+      <th>Subtotal</th>
+    </tr>
+    <tr>
+      <td>Forest carbon credits</td>
+      <td><input class="item-quantity" name="quantity" aria-label="Quantity" readonly /></td>
+      <td><span class="cart-amount"></span></td>
+    </tr>
+  </table>
+  <script is:inline>
+    const cart = JSON.parse(localStorage.getItem('cart') ?? '{"quantity":0,"unitPrice":0}');
+    const subtotal = cart.quantity * cart.unitPrice;
+    document.querySelector('.item-quantity').value = String(cart.quantity);
+    const amount = document.querySelector('.cart-amount');
+    amount.dataset.subtotal = String(subtotal);
+    amount.textContent = `$${subtotal.toFixed(2)}`;
+  </script>
+</Base>

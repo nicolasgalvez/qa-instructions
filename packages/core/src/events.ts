@@ -105,6 +105,11 @@ export type CheckEvent = {
   target?: ElementTarget;
   /** The expected value, when the runner reports one a person can read. */
   expected?: string;
+  /**
+   * The test author's own words for what is checked, e.g.
+   * `cart line-item quantity` in Playwright's `expect(qty, 'cart line-item quantity')`.
+   */
+  description?: string;
   /** True when this check is where the test failed. */
   failed?: boolean;
 };
