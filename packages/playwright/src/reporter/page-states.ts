@@ -174,6 +174,35 @@ export class PageStates {
   }
 
   /**
+   * How long the page's scroll offsets at the named snapshot held: when the
+   * last snapshot still recording them was taken, and when the first one
+   * recording others was (`Infinity` if none). Undefined without that
+   * snapshot.
+   */
+  scrollHeld(
+    pageId: string | undefined,
+    snapshotName: string,
+  ): { lastSeen: number; changedAt: number } | undefined {
+    if (pageId === undefined) return undefined;
+    // In the order the snapshots were recorded.
+    const moments = this.moments.get(pageId) ?? [];
+    const at = moments.findIndex((m) => m.name === snapshotName);
+    if (at < 0) return undefined;
+    const scroll = this.pageState(moments[at]).scroll;
+    let last = at;
+    while (
+      last + 1 < moments.length &&
+      this.pageState(moments[last + 1]).scroll === scroll
+    ) {
+      last += 1;
+    }
+    return {
+      lastSeen: moments[last].time,
+      changedAt: moments[last + 1]?.time ?? Infinity,
+    };
+  }
+
+  /**
    * When the page's DOM, form values, and scroll offsets were first recorded
    * as they are at the named snapshot, unchanged through it (ignoring which
    * element Playwright marked as a call's target).

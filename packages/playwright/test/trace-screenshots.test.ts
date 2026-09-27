@@ -562,6 +562,59 @@ test('trace format 8: a fill whose smooth scroll is not known to have settled by
   assert.deepEqual(moments(source.capture(V8_SMOOTH_UNSETTLED_FILL)), []);
 });
 
+/**
+ * The gift-card page's fill on Playwright 1.56, followed only by a check of
+ * its value and a 400ms wait (viewport 800×600): nothing that follows logs
+ * whether the page is still. The recording paints frames until the trace
+ * ends, all while the fill's smooth scroll eases in; the last shows neither
+ * the form nor the field, and the wait's last DOM snapshot records the page
+ * scrolled on from where it was when the fill ended.
+ */
+const V8_SMOOTH_EXPECT_FILL = ActionRef.of(
+  4,
+  `Fill "3" getByLabel('Gift card quantity')`,
+);
+
+test('trace format 8: a fill whose smooth scroll no later snapshot shows had settled gets no screenshot', async () => {
+  const source = await TraceScreenshotSource.open(
+    fixture('v8-smooth-expect.zip'),
+  );
+  assert.ok(source.capture(V8_SMOOTH_EXPECT_FILL));
+  assert.deepEqual(moments(source.capture(V8_SMOOTH_EXPECT_FILL)), []);
+});
+
+/**
+ * The boots page's trace on Playwright 1.56 (the derived-steps `/order` test,
+ * viewport 800×600): the fill scrolls the page at once, and the recording's
+ * last frame before the click scrolled is painted after the click's first
+ * DOM snapshot. The click then found the page still, never seeing it move,
+ * and the snapshots record no scroll between the fill's end and that check.
+ */
+const V8_SCROLL_STILL_FILL = ActionRef.of(
+  5,
+  `Fill "3" getByLabel('Trail boots quantity')`,
+);
+
+test('trace format 8: a fill followed by an Action that found the page still keeps its frame', async () => {
+  const source = await TraceScreenshotSource.open(
+    fixture('v8-scroll-still.zip'),
+  );
+  const fill = source.capture(V8_SCROLL_STILL_FILL);
+  assert.deepEqual(moments(fill), ['after']);
+  // The typed field turns green; most of its 140×39 CSS pixels show it.
+  const { data, info } = await sharp(shot(fill, 'after').data)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let green = 0;
+  for (let i = 0; i < data.length; i += info.channels) {
+    const near = (value: number, want: number) => Math.abs(value - want) <= 40;
+    if (near(data[i], 25) && near(data[i + 1], 169) && near(data[i + 2], 116)) {
+      green += 1;
+    }
+  }
+  assert.ok(green >= 2000, `the typed field is shown (${green} green pixels)`);
+});
+
 test('trace format 8: a check Playwright skipped (already checked) gets no screenshot', async () => {
   // Playwright neither scrolled to the radio nor clicked it, so no frame is
   // known to show it: the only one by its end shows the top of the page.

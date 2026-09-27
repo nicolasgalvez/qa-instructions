@@ -35,6 +35,8 @@ export type RecordedCall = {
    * `Infinity` if none did.
    */
   nextChange: number;
+  /** The DOM snapshot taken just after the call ended. */
+  afterSnapshot?: string;
   /** Whether the page's DOM snapshots show the call changed it; unknown without them. */
   changedPage?: boolean;
   /**
@@ -42,6 +44,11 @@ export type RecordedCall = {
    * still (`Infinity` if never); unknown if nothing saw it moving then.
    */
   settledAt?: number;
+  /**
+   * When a later Action, having not seen the page moving since the call
+   * ended, last found it still before the next change; unknown if none did.
+   */
+  stillAt?: number;
 };
 
 /**
@@ -102,7 +109,11 @@ export class RecordingFrames {
    * may show a smooth scroll still easing in, with the typed field not yet
    * in view. So when the page was seen still moving after a fill ended, the
    * fill gets only a frame painted at least PAINT_LAG after the page was
-   * next found still, or none.
+   * next found still, or none. Otherwise the fill gets the last frame only
+   * if the page is known not to have scrolled from the fill's end until it
+   * was painted (see `settledBy`): when nothing logs whether the page is
+   * still (the fill is followed by a check, a wait, or nothing), a scroll
+   * still easing in, or not yet recorded, gets none.
    */
   afterAction(call: RecordedCall): ScreencastFrame | undefined {
     const { pageId, nextChange, settledAt } = call;
@@ -117,10 +128,32 @@ export class RecordingFrames {
       );
     }
     const after = this.screencast.lastPaintedBetween(pageId, end, nextChange);
-    if (after || (typed && call.changedPage)) return after;
+    if (after) return !typed || this.settledBy(call, after) ? after : undefined;
+    if (typed && call.changedPage) return undefined;
     return (
       this.screencast.lastPaintedBy(pageId, end) ??
       this.screencast.first(pageId)
+    );
+  }
+
+  /**
+   * Whether the page is known not to have scrolled between the call's end
+   * and the frame: its DOM snapshots record the scroll offsets it ended
+   * with through one taken after the frame was painted, or through the
+   * moment a later Action found the page still after it.
+   */
+  private settledBy(call: RecordedCall, frame: ScreencastFrame): boolean {
+    const held =
+      call.afterSnapshot === undefined
+        ? undefined
+        : this.pages.scrollHeld(call.pageId, call.afterSnapshot);
+    if (!held) return false;
+    const { stillAt } = call;
+    return (
+      held.lastSeen >= frame.paintedAt ||
+      (stillAt !== undefined &&
+        stillAt >= frame.paintedAt &&
+        held.changedAt > stillAt)
     );
   }
 }
