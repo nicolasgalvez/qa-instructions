@@ -1,13 +1,35 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
+import sharp from 'sharp';
+
 import { GOLDENS, derivedSteps, root } from './shared.mjs';
 
 // The derived-steps tests on Playwright 1.56 must read exactly like the 1.63
 // goldens, and every QA Step must have a Step Screenshot from the trace's
-// screen recording (a JPEG frame, taken as the Action ended).
+// screen recording (a JPEG frame). A click whose frame shows the moment it
+// was made (moment `action`) has its click point marked; every other frame
+// is from when the Action ended (moment `after`) and is left unmarked.
 
 const JPEG = Buffer.from([0xff, 0xd8, 0xff]);
+
+/** The Highlight color, written out so the probe checks the drawing independently. */
+const HIGHLIGHT = [255, 0, 128];
+/** Per channel; the frames are JPEG, so colors drift a little. */
+const TOLERANCE = 40;
+
+/** The color at a CSS pixel of the viewport in a Step Screenshot. */
+async function colorAt(data, point, viewport) {
+  const { data: pixels, info } = await sharp(data)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const x = Math.floor((point.x * info.width) / viewport.width);
+  const y = Math.floor((point.y * info.height) / viewport.height);
+  const i = (y * info.width + x) * info.channels;
+  return [pixels[i], pixels[i + 1], pixels[i + 2]];
+}
+
+let markedClicks = 0;
 
 let failed = false;
 
@@ -56,24 +78,53 @@ for (const name of GOLDENS) {
       fail(`${label}: expected one Step Screenshot, got ${step.assetIds}`);
       continue;
     }
-    if (step.screenshotMoment !== 'after') {
+    const atAction = step.screenshotMoment === 'action';
+    if (atAction && !step.clickPoint) {
       fail(
-        `${label}: screenshot taken ${step.screenshotMoment}, expected after`,
+        `${label}: screenshot taken at the Action, but it has no click point`,
+      );
+    } else if (!atAction && step.screenshotMoment !== 'after') {
+      fail(
+        `${label}: screenshot taken ${step.screenshotMoment}, expected action or after`,
       );
     }
     const asset = bundle.assets[step.assetIds[0]];
+    // No element box before 1.63, so a click is marked by its dot alone.
+    const expectedMarks = atAction ? ['clickDot'] : undefined;
+    if (JSON.stringify(asset?.highlight) !== JSON.stringify(expectedMarks)) {
+      fail(
+        `${label}: Highlight ${JSON.stringify(asset?.highlight)}, expected ${JSON.stringify(expectedMarks)}`,
+      );
+    }
+    let data;
     try {
-      const data = await readFile(path.join(dir, 'assets', asset.filename));
+      data = await readFile(path.join(dir, 'assets', asset.filename));
       if (!data.subarray(0, 3).equals(JPEG) || data.length < 1000) {
         fail(`${label}: ${asset.filename} is not a screen recording frame`);
       }
     } catch (error) {
       fail(`${label}: missing screenshot ${asset?.filename}: ${error.message}`);
+      continue;
+    }
+    if (!atAction || !step.clickPoint || !step.viewport) continue;
+    const color = await colorAt(data, step.clickPoint, step.viewport);
+    if (color.some((c, k) => Math.abs(c - HIGHLIGHT[k]) > TOLERANCE)) {
+      fail(
+        `${label}: click point is rgb(${color}), expected the Highlight rgb(${HIGHLIGHT})`,
+      );
+    } else {
+      markedClicks += 1;
     }
   }
 }
 
+// Whether a frame shows the moment of a click depends on the recording's
+// timing, so not every click gets one; but most do, and some must.
+if (markedClicks === 0) {
+  fail('no click step has its click point marked');
+}
+
 if (failed) process.exit(1);
 console.log(
-  `verify-run: ok (${GOLDENS.length} 1.63 golden(s) matched on Playwright 1.56, with Step Screenshots)`,
+  `verify-run: ok (${GOLDENS.length} 1.63 golden(s) matched on Playwright 1.56, with Step Screenshots; ${markedClicks} click point(s) marked)`,
 );

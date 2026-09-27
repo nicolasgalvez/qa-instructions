@@ -52,6 +52,24 @@ test('geometry is scaled from the viewport to the image on a high-DPI (2x) run',
   });
 });
 
+test('a click point alone is marked, scaled down to a screen recording frame smaller than the viewport', () => {
+  // Playwright before 1.63 records a 1280x720 viewport as 800x450 frames,
+  // and records no element box.
+  const highlight = new HighlightPlanner().plan(
+    {
+      ...click,
+      viewport: { width: 1280, height: 720 },
+      elementBox: undefined,
+      clickPoint: { x: 640, y: 360 },
+    },
+    { width: 800, height: 450 },
+  );
+  assert.deepEqual(highlight, {
+    color: COLOR,
+    clickDot: { x: 400, y: 225, radius: 3.75, ringWidth: 1.25 },
+  });
+});
+
 test('without a known viewport the image is taken to be at viewport scale', () => {
   const highlight = new HighlightPlanner().plan(
     { ...click, viewport: undefined },

@@ -28,6 +28,15 @@ const MOMENTS: ReadonlySet<unknown> = new Set<QaScreenshotMoment>([
   'before',
 ]);
 
+/**
+ * How old, in milliseconds, the last recorded frame may be at the moment of
+ * an Action and still count as showing it. Around each Action, Playwright
+ * lets the page send a new frame every 35ms, so a change made since then
+ * may not have been recorded yet; an older frame may miss a scroll, a hover,
+ * or an animation.
+ */
+const ACTION_FRAME_AGE = 50;
+
 /** Why a trace gave no screenshots, when it was attached but could not be used. */
 export type TraceProblem =
   | { kind: 'unsupportedVersion'; version: unknown }
@@ -43,6 +52,8 @@ type CallRecord = {
   endTime?: number;
   box?: QaBox;
   point?: QaPoint;
+  /** The DOM snapshot taken as the input was sent, which dates the Action. */
+  inputSnapshot?: string;
   passwordField?: boolean;
   viewport?: QaSize;
 };
@@ -77,11 +88,36 @@ class Screencast {
    * then, or the first one after if none was painted yet.
    */
   frameAt(time: number, pageId: string | undefined): string | undefined {
-    const frames = this.frames
+    const frames = this.pageFrames(pageId);
+    return (this.lastPaintedBy(frames, time) ?? frames[0])?.file;
+  }
+
+  /**
+   * The frame showing the page at `time`: the last one painted by then, if
+   * it was painted no more than `within` milliseconds earlier. A frame
+   * painted after `time` is never used, since the Action may already have
+   * changed the page.
+   */
+  frameShowing(
+    time: number,
+    pageId: string | undefined,
+    within: number,
+  ): string | undefined {
+    const frame = this.lastPaintedBy(this.pageFrames(pageId), time);
+    return frame && time - frame.timestamp <= within ? frame.file : undefined;
+  }
+
+  private pageFrames(pageId: string | undefined): ScreencastFrame[] {
+    return this.frames
       .filter((frame) => pageId === undefined || frame.pageId === pageId)
       .sort((a, b) => a.timestamp - b.timestamp);
-    const painted = frames.filter((frame) => frame.timestamp <= time);
-    return (painted.at(-1) ?? frames[0])?.file;
+  }
+
+  private lastPaintedBy(
+    frames: ScreencastFrame[],
+    time: number,
+  ): ScreencastFrame | undefined {
+    return frames.filter((frame) => frame.timestamp <= time).at(-1);
   }
 }
 
@@ -96,6 +132,8 @@ class TraceCalls {
   readonly screencast = new Screencast();
   private readonly callByStep = new Map<string, string>();
   private readonly records = new Map<string, CallRecord>();
+  /** When each DOM snapshot was taken, by snapshot name. */
+  private readonly snapshotTimes = new Map<string, number>();
   private viewport?: QaSize;
 
   constructor(contexts: TraceEvent[][]) {
@@ -109,6 +147,17 @@ class TraceCalls {
   forStep(stepId: string): CallRecord | undefined {
     const callId = this.callByStep.get(stepId);
     return callId === undefined ? undefined : this.records.get(callId);
+  }
+
+  /**
+   * When the call sent its input: the time of the DOM snapshot Playwright
+   * takes just before (`input@<callId>`), on the same clock as the screen
+   * recording. Unknown without DOM snapshots.
+   */
+  inputTime(record: CallRecord): number | undefined {
+    return record.inputSnapshot === undefined
+      ? undefined
+      : this.snapshotTimes.get(record.inputSnapshot);
   }
 
   private add(event: TraceEvent): void {
@@ -148,6 +197,10 @@ class TraceCalls {
         Object.assign(this.record(callId), {
           box: this.box(event.box),
           point: this.point(event.point),
+          inputSnapshot:
+            typeof event.inputSnapshot === 'string'
+              ? event.inputSnapshot
+              : undefined,
         });
         break;
       case 'screenshot':
@@ -163,11 +216,20 @@ class TraceCalls {
 
   /**
    * A DOM snapshot (`snapshots.dom`) marks the element the call touched, so
-   * the page as recorded says whether it was a password field.
+   * the page as recorded says whether it was a password field. Its time is
+   * kept too: the input snapshot's time dates the Action.
    */
   private addSnapshot(snapshot: unknown): void {
     if (!this.isRecord(snapshot) || typeof snapshot.callId !== 'string') {
       return;
+    }
+    const { snapshotName, timestamp } = snapshot;
+    if (
+      typeof snapshotName === 'string' &&
+      typeof timestamp === 'number' &&
+      !this.snapshotTimes.has(snapshotName)
+    ) {
+      this.snapshotTimes.set(snapshotName, timestamp);
     }
     const record = this.record(snapshot.callId);
     if (record.passwordField !== undefined) return;
@@ -220,8 +282,8 @@ class TraceCalls {
 /**
  * Screenshot-source adapter over a Playwright trace (`trace.zip`). Joins each
  * `pw:api` step in the test runner's trace to the library call it made, and
- * returns that call's screen snapshots (or, without them, the screen
- * recording's frame from when the call ended), element box, and click point.
+ * returns that call's screen snapshots (or, without them, a frame of the
+ * screen recording), element box, and click point.
  * Never throws: an unreadable or unsupported trace gives no screenshots and
  * says why in `problem`.
  */
@@ -306,16 +368,36 @@ export class TraceScreenshotSource implements ScreenshotSource {
 
   /**
    * A call's per-action screenshots; without them (before 1.63, or without
-   * `snapshots.screen`), the screen recording's frame from when it ended.
+   * `snapshots.screen`), a frame of the screen recording: the one showing
+   * the moment of the Action when there is one, else the one from when the
+   * call ended.
    */
   private static images(record: CallRecord, calls: TraceCalls): ImageRef[] {
     if (record.screenshots.length > 0) return record.screenshots;
+    const action = this.actionFrame(record, calls);
+    if (action) return [{ moment: 'action', file: action }];
     const time = record.endTime ?? record.startTime;
     const frame =
       time === undefined
         ? undefined
         : calls.screencast.frameAt(time, record.pageId);
     return frame ? [{ moment: 'after', file: frame }] : [];
+  }
+
+  /**
+   * The recording's frame showing the page as an Action touched it, for an
+   * Action with a point or box to mark there. One that touched no point
+   * (a fill) keeps the frame from its end, which shows its result.
+   */
+  private static actionFrame(
+    record: CallRecord,
+    calls: TraceCalls,
+  ): string | undefined {
+    if (!record.point && !record.box) return undefined;
+    const time = calls.inputTime(record);
+    return time === undefined
+      ? undefined
+      : calls.screencast.frameShowing(time, record.pageId, ACTION_FRAME_AGE);
   }
 
   private static contentType(file: string): string {
