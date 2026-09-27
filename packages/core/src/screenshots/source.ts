@@ -21,6 +21,11 @@ export type ActionCapture = {
   box?: QaBox;
   /** Where the Action clicked or tapped, in viewport CSS pixels. */
   point?: QaPoint;
+  /**
+   * Whether the element the Action touched was a password field, as the page
+   * was recorded (not as the test code suggests). Undefined when unknown.
+   */
+  passwordField?: boolean;
 };
 
 export interface ScreenshotSource {

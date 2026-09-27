@@ -4,7 +4,9 @@ import type { Reporter, TestCase, TestResult } from '@playwright/test/reporter';
 import {
   QaInstructionsRecorder,
   QaInstructionsRun,
+  SecretMasker,
   TestSelection,
+  type MaskPattern,
   type TestSelectionOptions,
   writeBundle,
   type QaInstructionsResult,
@@ -28,6 +30,12 @@ export type QaInstructionsReporterOptions = {
    * not at all (`ignore`).
    */
   testSteps?: SectionPresentation;
+  /**
+   * More secrets to mask wherever they would appear (API keys, emails): exact
+   * strings, or regular expressions. Values typed into password fields are
+   * always masked when the trace records DOM snapshots.
+   */
+  mask?: MaskPattern[];
 };
 
 /**
@@ -42,8 +50,11 @@ export default class QaInstructionsReporter implements Reporter {
   constructor(
     options: QaInstructionsReporterOptions = {},
     private readonly translator = new PlaywrightStepTranslator(),
+    masker = new SecretMasker(options.mask),
     private readonly run = new QaInstructionsRun(
-      () => new QaInstructionsRecorder({ sections: options.testSteps }),
+      () => new QaInstructionsRecorder({ sections: options.testSteps, masker }),
+      undefined,
+      masker,
     ),
     private readonly traces = new AttemptTraces(),
   ) {

@@ -67,8 +67,15 @@ const PAGE_CHECKS: Record<string, CheckWording> = {
  * tester reads. Knows nothing about any test runner.
  */
 export class StepPhraser {
-  /** The "do this" sentence for a user Action. */
-  action(event: ActionEvent & { kind: UserActionKind }, url?: string): string {
+  /**
+   * The "do this" sentence for a user Action. Text typed into a password
+   * field is never repeated: the tester is told to enter their password.
+   */
+  action(
+    event: ActionEvent & { kind: UserActionKind },
+    url?: string,
+    field: { password?: boolean } = {},
+  ): string {
     const target = this.target(event.target);
     const value = this.emphasize(event.value ?? '');
 
@@ -85,7 +92,10 @@ export class StepPhraser {
         return `Hover over ${target}`;
       case 'fill':
       case 'type':
-        return event.value ? `Type ${value} into ${target}` : `Clear ${target}`;
+        if (!event.value) return `Clear ${target}`;
+        return field.password
+          ? `Type your password into ${target}`
+          : `Type ${value} into ${target}`;
       case 'clear':
         return `Clear ${target}`;
       case 'press':

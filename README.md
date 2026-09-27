@@ -16,7 +16,8 @@ export default defineConfig({
   ],
   use: {
     // Step Screenshots (Playwright 1.63+): a screenshot of the page per action.
-    trace: { mode: 'on', snapshots: { screen: true } },
+    // DOM snapshots let the reporter recognize password fields.
+    trace: { mode: 'on', snapshots: { screen: true, dom: true } },
   },
 });
 ```
@@ -44,6 +45,24 @@ When a test groups its actions with `test.step`, each group's title becomes a Se
 ```typescript
 ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs', testSteps: 'collapse' }],
 ```
+
+### Masking secrets
+
+Anything a test types into a password field never appears in QA Instructions; the step tells the tester to enter their password instead, and the value is replaced with `[masked]` wherever else it shows up (a later check, a URL). Whether a field is a password field comes from the page as recorded in the trace, so it needs DOM snapshots (`snapshots: { dom: true }`). Without them, only the `mask` option applies.
+
+Add other secrets (API keys, test account emails) with the `mask` option, as exact strings or regular expressions. They are masked in step text, Expected Results, URLs, Section titles, the test title, and bundle directory names:
+
+```typescript
+['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs', mask: ['sk-test-4f9a2c', /[\w.+-]+@qa\.example\.com/] }],
+```
+
+```
+1. Open http://127.0.0.1:4321/login
+2. Type **[masked]** into **Username** — **Username** shows **[masked]**
+3. Type your password into **Password** — **Password** shows **[masked]**
+```
+
+Masking covers text only. Password fields already show as dots in Step Screenshots; other masked values may still be visible in a screenshot.
 
 ## Render
 

@@ -105,6 +105,54 @@ for (const [version, path] of Object.entries(TRACES)) {
   });
 }
 
+for (const [version, path] of Object.entries(TRACES)) {
+  test(`trace format ${version} without DOM snapshots: whether a field is a password field is unknown`, async () => {
+    const source = await TraceScreenshotSource.open(path);
+    assert.equal(source.capture(FILL)?.passwordField, undefined);
+    assert.equal(source.capture(CLICK)?.passwordField, undefined);
+  });
+}
+
+/** Recorded from test/fixtures/traces/password.spec.ts, with DOM snapshots. */
+const DOM_TRACE = fixture('v9-dom.zip');
+const DOM_REFS = {
+  navigate: ActionRef.of(4, 'Navigate'),
+  name: ActionRef.of(5, 'Fill "Ada"'),
+  password: ActionRef.of(6, 'Fill "hunter2"'),
+  click: ActionRef.of(7, 'Click'),
+};
+
+test('with DOM snapshots, the trace says which Action touched a password field', async () => {
+  const source = await TraceScreenshotSource.open(DOM_TRACE);
+
+  assert.equal(source.capture(DOM_REFS.password)?.passwordField, true);
+  assert.equal(source.capture(DOM_REFS.name)?.passwordField, false);
+  assert.equal(source.capture(DOM_REFS.click)?.passwordField, false);
+  // A navigation touches no element.
+  assert.equal(source.capture(DOM_REFS.navigate)?.passwordField, undefined);
+  // Screenshots still come through alongside.
+  assert.ok((source.capture(DOM_REFS.password)?.screenshots.length ?? 0) > 0);
+});
+
+test('the password field type is read case-insensitively', async () => {
+  const entries = unzipSync(await readFile(DOM_TRACE));
+  for (const [name, data] of Object.entries(entries)) {
+    if (!name.endsWith('.trace')) continue;
+    entries[name] = strToU8(
+      strFromU8(data).replaceAll('"type":"password"', '"type":"PassWord"'),
+    );
+  }
+  const dir = await mkdtemp(path.join(tmpdir(), 'qa-trace-'));
+  try {
+    const relabeled = path.join(dir, 'trace.zip');
+    await writeFile(relabeled, zipSync(entries));
+    const source = await TraceScreenshotSource.open(relabeled);
+    assert.equal(source.capture(DOM_REFS.password)?.passwordField, true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('a trace in an unknown format version gives no screenshots', async () => {
   // The v9 sample, relabeled as a future format.
   const entries = unzipSync(await readFile(TRACES[9]));

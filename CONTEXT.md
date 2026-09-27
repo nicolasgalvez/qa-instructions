@@ -21,6 +21,9 @@ A QA Step placed where the test changed the page with a script instead of a user
 **Approximate**:
 Said of an Action the test forced past the runner's usual checks (`force: true`); its Highlight may not line up.
 
+**Secret**:
+A value that must never appear in QA Instructions: text typed into a password field (as recorded on the page, not guessed from the test), or anything matching a configured mask pattern. It is shown as `[masked]`, and a step that typed a password tells the tester to type their own.
+
 **Expected Result**:
 The "you should see" half of a QA Step, taken from the test's own checks that follow the Action. A QA Step may have none.
 _Avoid_: assertion (that is the test's code, not what the tester reads)

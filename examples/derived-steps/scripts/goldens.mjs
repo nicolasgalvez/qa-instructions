@@ -45,6 +45,11 @@ export const GOLDENS = [
     rendered: `qa-steps-out/failing/${name}.txt`,
     golden: `golden/failing/${name}.txt`,
   })),
+  // A password field and a configured mask pattern: both masked.
+  {
+    rendered: 'qa-steps-out/login--sign-in-with-a-password.txt',
+    golden: 'golden/login--sign-in-with-a-password.txt',
+  },
   {
     rendered: 'qa-steps-out/scripted-page--read-the-faq.txt',
     golden: 'golden/scripted-page--read-the-faq.txt',
@@ -54,6 +59,17 @@ export const GOLDENS = [
     golden: 'golden/scripted-page--subscribe-to-the-newsletter.txt',
   },
 ];
+
+/**
+ * What tests/login.spec.ts types: into a password field, and a value matching
+ * the config's `mask` pattern. Neither may appear in any file written under
+ * these directories.
+ */
+export const SECRETS = [
+  'correct-horse-battery-staple',
+  'tester@qa.example.com',
+];
+export const OUTPUT_DIRS = ['qa-runs', 'qa-steps-out'];
 
 /**
  * Hand-written expectations for each bundle's Step Screenshots: one per QA
