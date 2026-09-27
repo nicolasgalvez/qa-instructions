@@ -1,28 +1,29 @@
-import path from 'node:path';
-
 import type {
   FullConfig,
+  FullResult,
   Reporter,
   TestCase,
   TestResult,
 } from '@playwright/test/reporter';
 import {
+  BundleOutputDir,
   HighlightPlanner,
   QaInstructionsRecorder,
   QaInstructionsRun,
   SecretMasker,
+  StaleBundlePolicy,
   StepScreenshotHighlighter,
   TestSelection,
   type HighlightStyle,
   type MaskPattern,
   type TestSelectionOptions,
-  writeBundle,
   type QaInstructionsResult,
   type SectionPresentation,
 } from '@qa-instructions/core';
 
 import { AttemptTraces } from './attempt-traces.js';
 import { ReporterLog } from './reporter-log.js';
+import { PlaywrightRunCoverage } from './run-coverage.js';
 import { SharpScreenshotAnnotator } from './sharp-screenshot-annotator.js';
 import { PlaywrightStepTranslator } from './step-translator.js';
 import { TraceAdvice } from './trace-advice.js';
@@ -65,9 +66,11 @@ export type QaInstructionsReporterOptions = {
  * trace setting Step Screenshots need).
  */
 export default class QaInstructionsReporter implements Reporter {
-  private readonly outputDir: string;
+  private readonly output: BundleOutputDir;
   private readonly selection: TestSelection;
+  private readonly stalePolicy: StaleBundlePolicy;
   private advice = new TraceAdvice();
+  private config?: FullConfig;
 
   constructor(
     options: QaInstructionsReporterOptions = {},
@@ -85,18 +88,24 @@ export default class QaInstructionsReporter implements Reporter {
       (step, error) => this.warnHighlight(step.action, error),
     ),
     private readonly log = new ReporterLog(),
+    private readonly coverage = new PlaywrightRunCoverage(),
   ) {
-    this.outputDir = options.outputDir ?? 'qa-runs';
+    this.output = new BundleOutputDir(options.outputDir ?? 'qa-runs');
     this.selection = this.selectionOf(options.select);
+    this.stalePolicy = new StaleBundlePolicy(this.selection);
   }
 
   printsToStdio(): boolean {
     return false;
   }
 
-  /** Learns the project's Playwright version, for version-specific advice. */
+  /**
+   * Learns the project's Playwright version, for version-specific advice, and
+   * the run's configuration, to tell whether it covers the whole suite.
+   */
   onBegin(config: FullConfig): void {
     try {
+      this.config = config;
       this.advice = new TraceAdvice(config?.version);
     } catch (error) {
       this.log.error('this run', error);
@@ -120,20 +129,42 @@ export default class QaInstructionsReporter implements Reporter {
   /**
    * Writes one bundle per test once every attempt has been seen, with Step
    * Screenshots from the trace of the attempt it came from, highlighted.
+   * Then removes stale bundles from earlier runs (see `StaleBundlePolicy`).
    */
-  async onEnd(): Promise<void> {
+  async onEnd(result?: FullResult): Promise<void> {
     let results: QaInstructionsResult[] = [];
     try {
       results = this.run.results();
     } catch (error) {
       this.log.error('this run', error);
     }
-    for (const result of results) {
+    for (const testResult of results) {
       try {
-        await this.write(result);
+        await this.write(testResult);
       } catch (error) {
-        this.log.error(result.bundle.meta.title, error);
+        this.log.error(testResult.bundle.meta.title, error);
       }
+    }
+    await this.removeStale(results, result);
+  }
+
+  /**
+   * Every directory this run has a result for counts as current, even one
+   * that failed to write, so a write error never costs an earlier bundle.
+   */
+  private async removeStale(
+    results: QaInstructionsResult[],
+    result: FullResult | undefined,
+  ): Promise<void> {
+    try {
+      const stale = this.stalePolicy.staleDirs(
+        await this.output.owned(),
+        new Set(results.map(({ dirName }) => dirName)),
+        this.coverage.of(this.config, result),
+      );
+      await this.output.remove(stale);
+    } catch (error) {
+      this.log.error('stale QA Instructions', error);
     }
   }
 
@@ -148,11 +179,10 @@ export default class QaInstructionsReporter implements Reporter {
     const { bundle, assets } = await this.highlighter.highlight(
       result.record(source),
     );
-    await writeBundle(
-      path.join(this.outputDir, result.dirName),
-      bundle,
-      assets,
-    );
+    await this.output.write(result.dirName, bundle, assets, {
+      file: result.start.file,
+      tags: result.start.tags,
+    });
   }
 
   private warnHighlight(step: string, error: unknown): void {

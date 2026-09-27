@@ -32,7 +32,7 @@ export class TestSelection {
     );
   }
 
-  includes(test: TestStartEvent): boolean {
+  includes(test: Pick<TestStartEvent, 'file' | 'tags'>): boolean {
     return this.matchesTags(test.tags) && this.matchesFile(test.file);
   }
 
