@@ -4,6 +4,15 @@ Turns what your existing Playwright tests already do into QA Instructions: steps
 
 ## Setup
 
+The packages are not on npm yet. Build a checkout, then install its reporter and CLI into your project:
+
+```bash
+git clone https://github.com/procyon-creative/qa-instructions
+cd qa-instructions && pnpm install && pnpm build
+cd ../your-project
+npm install -D file:../qa-instructions/packages/playwright file:../qa-instructions/packages/cli
+```
+
 Add the reporter, and the trace setting for Step Screenshots, to `playwright.config.ts`:
 
 ```typescript
@@ -12,29 +21,96 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   reporter: [
     ['list'],
-    ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs' }],
+    [
+      '@qa-instructions/playwright/reporter',
+      {
+        outputDir: 'qa-runs',
+        testSteps: 'sections',
+        highlight: ['outline', 'clickDot'],
+        // Only tests tagged @qa produce QA Instructions:
+        // select: { tags: ['@qa'] },
+        // mask: ['sk-test-4f9a2c', /[\w.+-]+@qa\.example\.com/],
+      },
+    ],
   ],
   use: {
-    // Step Screenshots (Playwright 1.63+): a screenshot of the page per action.
-    // DOM snapshots let the reporter recognize password fields.
+    // Step Screenshots: a screenshot of the page per Action. DOM snapshots
+    // let the reporter recognize password fields.
+    // Playwright 1.63+:
     trace: { mode: 'on', snapshots: { screen: true, dom: true } },
+    // Playwright 1.53–1.62: trace: 'on',
   },
 });
 ```
 
-That is the whole setup. Run your tests as usual (`npx playwright test`); the reporter writes one QA Instructions bundle per test to `qa-runs/`.
+Every option is optional; `['@qa-instructions/playwright/reporter']` alone works. See [Reporter options](#reporter-options).
+
+Run your tests as usual (`npx playwright test`); the reporter writes one QA Instructions bundle per test to `qa-runs/<file>--<test title>/`. Then [render](#render) them:
+
+```bash
+npx qa-instructions render qa-runs --format qa-steps --out qa-steps-out
+```
 
 `@playwright/test` is a peer dependency used for types only, so the package always runs against your project's own Playwright and never loads a second copy.
 
 With the trace setting on, each QA Step gets a Step Screenshot of the page at the moment of its Action, saved in the bundle's `assets/` and listed in the step's `assetIds`. The element acted on (`elementBox`), for clicks the click point (`clickPoint`), and the page's `viewport` are recorded on the step in CSS pixels. Without the setting, QA Steps are text only.
 
-### Highlights
+### Setup mistakes
 
-Each Step Screenshot carries a Highlight on the element its Action touched: by default a pink outline 2px clear of the element, and for clicks a white-ringed dot where the click landed. Fills get the outline only; navigation and key presses touch no element and get none. Choose the look with the reporter's `highlight` option:
+Without the trace setting, QA Steps are text only, and the reporter prints one warning per run with the line to add for your Playwright version. The reporter never fails the test run: a setup mistake (such as an unusable `select`, which is then ignored) or an error inside it is printed once on stderr, and the tests' own results are unaffected.
+
+## Reporter options
+
+The second element of the reporter entry in `playwright.config.ts`.
+
+| Option      | Type                                                                              | Default                     |
+| ----------- | --------------------------------------------------------------------------------- | --------------------------- |
+| `outputDir` | `string`                                                                          | `'qa-runs'`                 |
+| `select`    | `{ tags?: string[]; files?: string[] }`                                           | every test                  |
+| `testSteps` | `'sections' \| 'collapse' \| 'ignore'`                                            | `'sections'`                |
+| `highlight` | `'outline' \| 'clickDot' \| 'badge' \| 'spotlight'`, a list of these, or `'none'` | `['outline', 'clickDot']`   |
+| `mask`      | `(string \| RegExp)[]`                                                            | none (password fields only) |
+
+### `outputDir`
+
+Where bundles are written, relative to the directory you run Playwright from. Each test gets `<outputDir>/<file>--<test title>/` (with the project, then the line, added only when two tests would otherwise share a directory). A retried test keeps its last attempt.
 
 ```typescript
-['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs', highlight: ['outline', 'badge'] }],
+{
+  outputDir: 'artifacts/qa-runs';
+}
 ```
+
+### `select`
+
+Limits which tests produce QA Instructions. Unselected tests still run and produce nothing.
+
+- `tags`: tests carrying any of these tags, matched exactly (`'@qa'`, including the `@`).
+- `files`: tests whose file matches any of these globs. A relative pattern matches the end of the test file path (`'auth/*.spec.ts'`); an absolute one, or one starting with `**`, matches the whole path.
+
+Given both, a test must match both. An empty or missing list places no limit.
+
+```typescript
+{ select: { tags: ['@qa'], files: ['checkout/*.spec.ts'] } }
+```
+
+### `testSteps`
+
+How the test's own `test.step` groups appear:
+
+- `'sections'`: each group's title is a Section heading over its QA Steps, numbered continuously across Sections, with nested groups read as `Outer › Inner`.
+- `'collapse'`: each outermost group becomes one QA Step named after it.
+- `'ignore'`: groups are dropped and QA Steps are listed flat.
+
+```typescript
+{
+  testSteps: 'collapse';
+}
+```
+
+### `highlight`
+
+The Highlight each Step Screenshot carries on the element its Action touched. Give one style or a list; the default is `['outline', 'clickDot']`: a pink outline 2px clear of the element, and for clicks a white-ringed dot where the click landed.
 
 | Style       | Look                                                     |
 | ----------- | -------------------------------------------------------- |
@@ -44,17 +120,38 @@ Each Step Screenshot carries a Highlight on the element its Action touched: by d
 | `spotlight` | Everything but the element dimmed                        |
 | `none`      | No marks                                                 |
 
-Give one style or a list; the default is `['outline', 'clickDot']`.
+```typescript
+{
+  highlight: ['outline', 'badge'];
+}
+```
 
-- Highlights are drawn when the bundle is written, after the run; nothing is injected into the browser. The highlighted image replaces the original in `assets/`, and the bundle's asset lists the marks it carries (`"highlight": ["outline", "clickDot"]`). Use `highlight: 'none'` to keep screenshots unmarked.
+- Fills get the outline only; navigation and key presses touch no element and get none.
+- Highlights are drawn when the bundle is written, after the run; nothing is injected into the browser. The highlighted image replaces the original in `assets/`, and the bundle's asset lists the marks it carries (`"highlight": ["outline", "clickDot"]`).
 - Positions are scaled from the viewport to the image, so high-DPI (`deviceScaleFactor: 2`) screenshots are marked in the right place.
-- An approximate step (a forced click) gets a dashed outline: the element may have moved.
-- Warning steps, and screenshots taken after the Action (the page may have moved on), get no Highlight.
+- An Approximate Action (a forced click) gets a dashed outline: the element may have moved.
+- Warning steps, and screenshots taken after the Action (the page may have moved on), get no Highlight. On Playwright 1.53–1.62 no screenshot gets one (see [Playwright versions](#playwright-versions)).
 - A screenshot that cannot be drawn on is kept unmarked, with a warning.
 
-### Setup mistakes
+### `mask`
 
-Without the trace setting, QA Steps are text only, and the reporter prints one warning per run with the line to add. The reporter never fails the test run: a setup mistake or an error inside it is printed once on stderr, and the tests' own results are unaffected.
+More Secrets to mask: exact strings, or regular expressions (every match is masked; no `g` flag needed). Each is replaced with `[masked]` in QA Step text, Expected Results, URLs, Section titles, the test title, and bundle directory names.
+
+```typescript
+{
+  mask: ['sk-test-4f9a2c', /[\w.+-]+@qa\.example\.com/];
+}
+```
+
+Anything a test types into a password field is masked without configuration: the QA Step tells the tester to enter their own password, and the value is replaced with `[masked]` wherever else it shows up (a later check, a URL). Whether a field is a password field comes from the page as recorded in the trace's DOM snapshots; without them, only `mask` applies.
+
+```
+1. Open http://127.0.0.1:4321/login
+2. Type **[masked]** into **Username** — **Username** shows **[masked]**
+3. Type your password into **Password** — **Password** shows **[masked]**
+```
+
+Masking covers text only. Password fields already show as dots in Step Screenshots; other masked values may still be visible in a screenshot.
 
 ## Playwright versions
 
@@ -69,7 +166,7 @@ On 1.53–1.62 the QA Steps and Expected Results read the same as on 1.63; scree
 
 ## What you get
 
-Each test's browser Actions (opening a URL, clicking, typing, pressing keys, choosing options) become numbered QA Steps, and the `expect` checks that follow an Action become its Expected Result. Waits, scripts, value reads, and API requests are left out because a tester cannot repeat them.
+Each test's browser Actions (opening a URL, clicking, typing, pressing keys, choosing options) become numbered QA Steps, and the `expect` checks that follow an Action become its Expected Result. Waits, scripts, value reads, and API requests are left out because a tester cannot repeat them. A test's `test.step` groups become Sections (see [`testSteps`](#teststeps)).
 
 ```
 1. Open http://127.0.0.1:4321/ — The **Fixture App** heading is visible
@@ -79,39 +176,15 @@ Each test's browser Actions (opening a URL, clicking, typing, pressing keys, cho
 5. Press **Tab**
 ```
 
-When a test groups its actions with `test.step`, each group's title becomes a Section heading over its QA Steps, with numbering continuous across Sections and nested groups read as `Outer › Inner`. Set the reporter's `testSteps` option to `'collapse'` to turn each group into one QA Step named after it, or to `'ignore'` to list the steps flat:
-
-```typescript
-['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs', testSteps: 'collapse' }],
-```
-
-### Masking secrets
-
-Anything a test types into a password field never appears in QA Instructions; the step tells the tester to enter their password instead, and the value is replaced with `[masked]` wherever else it shows up (a later check, a URL). Whether a field is a password field comes from the page as recorded in the trace, so it needs DOM snapshots (`snapshots: { dom: true }`). Without them, only the `mask` option applies.
-
-Add other secrets (API keys, test account emails) with the `mask` option, as exact strings or regular expressions. They are masked in step text, Expected Results, URLs, Section titles, the test title, and bundle directory names:
-
-```typescript
-['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs', mask: ['sk-test-4f9a2c', /[\w.+-]+@qa\.example\.com/] }],
-```
-
-```
-1. Open http://127.0.0.1:4321/login
-2. Type **[masked]** into **Username** — **Username** shows **[masked]**
-3. Type your password into **Password** — **Password** shows **[masked]**
-```
-
-Masking covers text only. Password fields already show as dots in Step Screenshots; other masked values may still be visible in a screenshot.
-
 ## Render
 
 Rendering is a separate step, so you can re-render without re-running tests:
 
 ```bash
-qa-instructions render qa-runs/ --format qa-steps --out qa-steps-out/
+qa-instructions render <bundle-dir> --format <format> --out <dir>
 ```
 
-Paste `qa-steps-out/*.txt` into your ticket's QA Steps.
+`<bundle-dir>` is the reporter's `outputDir` (every bundle directly inside it is rendered) or one bundle's directory. `--format` defaults to `qa-steps` and `--out` to `qa-steps-out`. For example, `qa-instructions render qa-runs --format qa-steps --out qa-steps-out`, then paste `qa-steps-out/*.txt` into your ticket's QA Steps.
 
 Every format shows the same QA Steps, Expected Results, Sections, warnings, and status:
 
