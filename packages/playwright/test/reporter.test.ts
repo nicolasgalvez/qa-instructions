@@ -671,6 +671,53 @@ test('Step Screenshots are highlighted by default: an outline, and the click poi
   assert.deepEqual(bundle.steps[2].viewport, { width: 400, height: 300 });
 });
 
+// The same scenario on Playwright 1.56 (trace format 8), whose step titles
+// carry the details and whose trace has only a screen recording.
+const v8Trace: TestResult['attachments'] = [
+  {
+    name: 'trace',
+    contentType: 'application/zip',
+    path: fileURLToPath(
+      new URL('../../test/fixtures/traces/v8.zip', import.meta.url),
+    ),
+  },
+];
+const v8Steps: StepSpec[] = [
+  sampleSteps[0],
+  { category: 'pw:api', title: 'Navigate to "data:"' },
+  {
+    category: 'test.step',
+    title: 'fill in the form',
+    steps: [{ category: 'pw:api', title: `Fill "Ada" getByLabel('Name')` }],
+  },
+  {
+    category: 'pw:api',
+    title: `Click getByRole('button', { name: 'Paint' })`,
+  },
+  { category: 'pw:api', title: 'Press "Tab"' },
+  closeContext,
+];
+
+test('on Playwright 1.56 a click is marked at its click point on the frame from the moment it was made', async () => {
+  const { bundle } = await runAttempts([
+    { steps: v8Steps, attachments: v8Trace },
+  ]);
+
+  assert.deepEqual(
+    bundle.steps.map((step) => step.screenshotMoment),
+    ['after', 'after', 'action', 'after'],
+  );
+  // The 1.56 trace records no element box, so there is no outline.
+  assert.deepEqual(highlights(bundle), [
+    undefined,
+    undefined,
+    ['clickDot'],
+    undefined,
+  ]);
+  assert.deepEqual(bundle.steps[2].clickPoint, { x: 100, y: 60 });
+  assert.equal(bundle.steps[2].elementBox, undefined);
+});
+
 test('reporter passes the highlight style option to the core', async () => {
   const badge = await runAttempts(
     [{ steps: sampleSteps, attachments: sampleTrace }],

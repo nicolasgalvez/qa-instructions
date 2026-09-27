@@ -83,6 +83,9 @@ importers:
       '@qa-instructions/playwright':
         specifier: workspace:*
         version: link:../../packages/playwright
+      sharp:
+        specifier: ^0.35.4
+        version: 0.35.4(@types/node@22.20.1)
 
   examples/fixture-site:
     devDependencies:

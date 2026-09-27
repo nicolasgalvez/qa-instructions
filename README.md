@@ -157,12 +157,12 @@ Masking covers text only. Password fields already show as dots in Step Screensho
 
 Requires `@playwright/test` 1.53 or later.
 
-| Playwright | Step details                                     | Step Screenshots                                                      | Trace setting                                                            |
-| ---------- | ------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 1.63+      | Step data (`subtitle`, `params`)                 | One full-size screenshot per Action, element box and click point      | `use: { trace: { mode: 'on', snapshots: { screen: true, dom: true } } }` |
-| 1.53–1.62  | Step titles, plus each check's line in your test | The screen recording's frame from when each Action ended; click point | `use: { trace: 'on' }`                                                   |
+| Playwright | Step details                                     | Step Screenshots                                                 | Trace setting                                                            |
+| ---------- | ------------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1.63+      | Step data (`subtitle`, `params`)                 | One full-size screenshot per Action, element box and click point | `use: { trace: { mode: 'on', snapshots: { screen: true, dom: true } } }` |
+| 1.53–1.62  | Step titles, plus each check's line in your test | A frame of the screen recording per Action; click point          | `use: { trace: 'on' }`                                                   |
 
-On 1.53–1.62 the QA Steps and Expected Results read the same as on 1.63; screenshots are rougher (recorded JPEG frames taken as the Action ended, so no element box and no Highlight). Two limits there: a check whose subject is a variable (`expect(button).toBeVisible()`) has no element to name, and a navigation to an absolute URL held in a variable keeps only its path. Traces in formats other than 8, 9, and 10 give text-only QA Instructions and a warning.
+On 1.53–1.62 the QA Steps and Expected Results read the same as on 1.63; screenshots are rougher (recorded JPEG frames, and no element box, so no outline). A click gets the frame drawn at the moment it was made, with its click point marked, when the recording has one from no more than 50ms before; any other Action, or a click without such a frame, gets the frame from when it ended, unmarked. Two limits there: a check whose subject is a variable (`expect(button).toBeVisible()`) has no element to name, and a navigation to an absolute URL held in a variable keeps only its path. Traces in formats other than 8, 9, and 10 give text-only QA Instructions and a warning.
 
 ## What you get
 
@@ -237,7 +237,7 @@ All examples are unmodified Playwright tests with the reporter added to their co
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `examples/verification`       | Deterministic e2e: golden bundle and QA Steps for a test-id flow                                                                                                                         |
 | `examples/derived-steps`      | Role/label locators, helper functions, dropped test plumbing, and Step Screenshot and Highlight pixel probes (sticky header, hamburger menu, animated accordion; 1x and 2x; every style) |
-| `examples/derived-steps-1.56` | The derived-steps tests on Playwright 1.56: same QA Steps as 1.63, screen-recording screenshots, missing-trace warning                                                                   |
+| `examples/derived-steps-1.56` | The derived-steps tests on Playwright 1.56: same QA Steps as 1.63, screen-recording screenshots with click points marked, missing-trace warning                                          |
 | `examples/basic`              | Optional smoke against playwright.dev                                                                                                                                                    |
 
 ```bash

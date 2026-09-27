@@ -233,7 +233,7 @@ async function v8Frames(): Promise<Buffer[]> {
     .map((name) => Buffer.from(entries[name]));
 }
 
-test('trace format 8: each Action gets the screen recording frame nearest its end', async () => {
+test('trace format 8: an Action that touched no point gets the screen recording frame nearest its end', async () => {
   const source = await TraceScreenshotSource.open(fixture('v8.zip'));
   assert.equal(source.problem, undefined);
   const frames = await v8Frames();
@@ -244,7 +244,6 @@ test('trace format 8: each Action gets the screen recording frame nearest its en
     [V8.NAVIGATE, 0],
     // Otherwise the last frame painted by the time the Action ended.
     [V8.FILL, 2],
-    [V8.CLICK, 3],
     [V8.PRESS, 3],
   ] as const) {
     const screenshots = source.capture(ref)?.screenshots ?? [];
@@ -276,6 +275,80 @@ test('trace format 8: the click point comes from the trace, with no element box'
   const source = await TraceScreenshotSource.open(fixture('v8.zip'));
   assert.deepEqual(source.capture(V8.CLICK)?.point, { x: 100, y: 60 });
   assert.equal(source.capture(V8.CLICK)?.box, undefined);
+});
+
+/**
+ * The v8 sample with its library trace rewritten. In it the click's input
+ * snapshot is taken at 2436.618 and the recording's frames arrive at
+ * 2332.608, 2360.165, 2390.372, and 2401.415 (frames 0–3).
+ */
+async function v8With(
+  edit: (libraryTrace: string) => string,
+): Promise<TraceScreenshotSource> {
+  const entries = unzipSync(await readFile(fixture('v8.zip')));
+  entries['0-trace.trace'] = strToU8(edit(strFromU8(entries['0-trace.trace'])));
+  return openEntries(entries);
+}
+
+test('trace format 8: a click gets the frame drawn at the moment of the Action', async () => {
+  const source = await TraceScreenshotSource.open(fixture('v8.zip'));
+  const frames = await v8Frames();
+
+  const screenshots = source.capture(V8.CLICK)?.screenshots ?? [];
+  assert.deepEqual(
+    screenshots.map((s) => s.moment),
+    ['action'],
+  );
+  assert.equal(screenshots[0].contentType, 'image/jpeg');
+  // Frame 3 arrived 35ms before the click's input snapshot.
+  assert.ok(screenshots[0].data.equals(frames[3]));
+});
+
+test('trace format 8: the moment-of-Action frame is the last one drawn before the input, never one after it', async () => {
+  // Input at 2400.000: frame 3 (2401.415) is nearer but arrived after it,
+  // when the click may already have changed the page.
+  const source = await v8With((trace) =>
+    trace.replace('"timestamp":2436.618', '"timestamp":2400.000'),
+  );
+  const frames = await v8Frames();
+  const screenshots = source.capture(V8.CLICK)?.screenshots ?? [];
+  assert.deepEqual(
+    screenshots.map((s) => s.moment),
+    ['action'],
+  );
+  assert.ok(screenshots[0].data.equals(frames[2]));
+});
+
+test('trace format 8: with no frame drawn just before the input, a click keeps the frame from its end, unmarked', async () => {
+  // Input at 2461.618: the last frame (3) arrived 60ms earlier, so the page
+  // may have changed since without the recording showing it yet.
+  const source = await v8With((trace) =>
+    trace
+      .replace('"timestamp":2436.618', '"timestamp":2461.618')
+      .replace('"endTime":2444.709', '"endTime":2464.709'),
+  );
+  const frames = await v8Frames();
+  const screenshots = source.capture(V8.CLICK)?.screenshots ?? [];
+  assert.deepEqual(
+    screenshots.map((s) => s.moment),
+    ['after'],
+  );
+  assert.ok(screenshots[0].data.equals(frames[3]));
+  // The click point is still reported; the core leaves `after` frames unmarked.
+  assert.deepEqual(source.capture(V8.CLICK)?.point, { x: 100, y: 60 });
+});
+
+test('trace format 8: without the input snapshot the moment of the Action is unknown, so a click keeps the frame from its end', async () => {
+  const source = await v8With((trace) =>
+    trace
+      .split('\n')
+      .filter((line) => !line.includes('"snapshotName":"input@call@16"'))
+      .join('\n'),
+  );
+  assert.deepEqual(
+    (source.capture(V8.CLICK)?.screenshots ?? []).map((s) => s.moment),
+    ['after'],
+  );
 });
 
 test('a later trace without per-action screenshots falls back to the screen recording', async () => {
