@@ -1,11 +1,22 @@
-import type { CheckCapture, ExpectedPattern } from '@qa-instructions/core';
+import type {
+  CheckCapture,
+  ExpectedPattern,
+  RecordedElement,
+} from '@qa-instructions/core';
 
 import { CheckRef } from './action-ref.js';
 import { SelectorParser } from './selector-parser.js';
 import type { TraceEvent } from './trace-archive.js';
 
-/** What the browser recorded for a check it ran (`Frame.expect`). */
-export type BrowserCheck = { selector?: string; expectedText?: unknown };
+/**
+ * What the browser recorded for a check it ran (`Frame.expect`), and the
+ * element it checked as its DOM snapshot recorded it.
+ */
+export type BrowserCheck = {
+  selector?: string;
+  expectedText?: unknown;
+  element?: RecordedElement;
+};
 
 /**
  * The trace's value preview for anything that is not a string, number,
@@ -52,6 +63,7 @@ export class TraceChecks {
     const capture: CheckCapture = {
       ...(target ? { target } : {}),
       ...expected,
+      ...(browser?.element ? { element: browser.element } : {}),
     };
     return Object.keys(capture).length > 0 ? capture : undefined;
   }

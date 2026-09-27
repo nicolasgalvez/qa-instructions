@@ -26,7 +26,7 @@
 
 4. Click the **Submit good credentials** link
 
-   **Expected:** The **welcome message** element shows **Logged in as demo-user**
+   **Expected:** The page shows **Logged in as demo-user**
 
    ![Step 4: Click the Submit good credentials link](grouped--sign-in-with-good-credentials/step-04.png)
 

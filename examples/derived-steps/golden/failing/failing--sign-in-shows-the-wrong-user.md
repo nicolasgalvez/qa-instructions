@@ -16,6 +16,6 @@
 
 4. Click the **Submit good credentials** link
 
-   **Expected:** The **welcome message** element shows **Logged in as admin** (**test failed here**)
+   **Expected:** The page shows **Logged in as admin** (**test failed here**)
 
    ![Step 4: Click the Submit good credentials link](failing--sign-in-shows-the-wrong-user/step-04.png)

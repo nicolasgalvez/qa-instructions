@@ -46,7 +46,8 @@ export default defineConfig({
     baseURL,
     viewport: { width: 800, height: 600 },
     // Step Screenshots: one screen snapshot per action (Playwright 1.63+).
-    // DOM snapshots let the reporter recognize password fields.
+    // DOM snapshots let the reporter recognize password fields and name
+    // elements found by test id or CSS selector.
     trace: { mode: 'on', snapshots: { screen: true, dom: true } },
   },
   webServer: {

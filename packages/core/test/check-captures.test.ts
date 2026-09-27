@@ -87,7 +87,7 @@ test('what the test reported wins over what the source recorded', () => {
     c1: { target: { by: 'selector', value: 'input' }, expected: '4' },
   });
   assert.deepEqual(expected(source, check), [
-    'The **Quantity** spinbutton shows **3**',
+    'The **Quantity** number field shows **3**',
   ]);
 });
 

@@ -5,28 +5,20 @@ import type {
   ExpectedPattern,
   UserActionKind,
 } from '../events.js';
+import type { RecordedElement } from '../screenshots/source.js';
+import { ElementNamer, ROLE_NOUNS, type ElementName } from './element-namer.js';
 
-/** Words a tester uses for common ARIA roles. */
-const ROLE_NOUNS: Record<string, string> = {
-  button: 'button',
-  link: 'link',
-  heading: 'heading',
-  textbox: 'field',
-  searchbox: 'search field',
-  combobox: 'dropdown',
-  listbox: 'list',
-  option: 'option',
-  checkbox: 'checkbox',
-  radio: 'option',
-  switch: 'switch',
-  tab: 'tab',
-  menuitem: 'menu item',
-  img: 'image',
-  dialog: 'dialog',
-  alert: 'alert',
-  navigation: 'navigation',
-  row: 'row',
-  cell: 'cell',
+/** Checks about the text an element shows, which therefore cannot name it. */
+const TEXT_MATCHERS: ReadonlySet<string> = new Set([
+  'toHaveText',
+  'toContainText',
+]);
+
+/** What the page recorded of the element an Action or check touched. */
+export type RecordedFacts = {
+  /** The element was a password field. */
+  password?: boolean;
+  element?: RecordedElement;
 };
 
 type CheckWording = { positive: string; negative: string };
@@ -118,6 +110,8 @@ const PLAIN_PATTERN = /^(?:[^\\^$.*+?()[\]{}|]|\\[^A-Za-z0-9])+$/;
  * tester reads. Knows nothing about any test runner.
  */
 export class StepPhraser {
+  constructor(private readonly namer = new ElementNamer()) {}
+
   /**
    * The "do this" sentence for a user Action. Text typed into a password
    * field is never repeated: the tester is told to enter their password.
@@ -125,9 +119,9 @@ export class StepPhraser {
   action(
     event: ActionEvent & { kind: UserActionKind },
     url?: string,
-    field: { password?: boolean } = {},
+    field: RecordedFacts = {},
   ): string {
-    const target = this.target(event.target);
+    const target = this.target(event.target, field);
     const value = this.emphasize(event.value ?? '');
 
     switch (event.kind) {
@@ -176,14 +170,15 @@ export class StepPhraser {
    * The warning a tester reads where the test changed the page with a
    * script instead of a user action.
    */
-  scriptChange(event: ActionEvent): string {
+  scriptChange(event: ActionEvent, recorded: RecordedFacts = {}): string {
     const byScript = 'with a script instead of a user action.';
     const byHand =
       'If the page does not match what comes next, you may need to do something by hand to continue.';
-    const target = this.target(event.target);
+    const target = this.target(event.target, recorded);
+    const touched = event.target || recorded.element;
 
     if (event.kind === 'dispatch') {
-      if (event.value === 'click' && event.target) {
+      if (event.value === 'click' && touched) {
         return `The test clicked ${target} ${byScript} Click it yourself to continue.`;
       }
       const type = event.value
@@ -192,7 +187,7 @@ export class StepPhraser {
       return `The test sent ${type} to ${target} ${byScript} ${byHand}`;
     }
 
-    return event.target
+    return touched
       ? `The test changed ${target} ${byScript} If the page does not match what comes next, change it by hand to continue.`
       : `The test changed the page ${byScript} ${byHand}`;
   }
@@ -201,9 +196,15 @@ export class StepPhraser {
    * The "you should see" phrase for a check, starting lowercase so several
    * can be joined. Undefined when a tester could not see what was checked.
    */
-  check(event: CheckEvent): string | undefined {
+  check(event: CheckEvent, recorded: RecordedFacts = {}): string | undefined {
+    // A check the runner could not trace to the page (e.g. a locator held
+    // in a variable) is still about an element if the page recorded one.
+    if (event.subject === 'value' && recorded.element) {
+      return this.check({ ...event, subject: 'element' }, recorded);
+    }
+
     if (event.expected === undefined && event.expectedPattern) {
-      return this.patternCheck(event, event.expectedPattern);
+      return this.patternCheck(event, event.expectedPattern, recorded);
     }
 
     if (event.subject === 'value') {
@@ -221,7 +222,7 @@ export class StepPhraser {
     }
 
     const wording = ELEMENT_CHECKS[event.matcher];
-    const subject = this.checkedElement(event);
+    const subject = this.checkedElement(event, recorded);
     if (!wording || !subject) return undefined;
     if (wording.positive.includes('%v') && event.expected === undefined) {
       return undefined;
@@ -236,6 +237,7 @@ export class StepPhraser {
   private patternCheck(
     event: CheckEvent,
     pattern: ExpectedPattern,
+    recorded: RecordedFacts,
   ): string | undefined {
     const noun = PATTERN_SUBJECTS[event.subject][event.matcher];
     if (noun === undefined) return undefined;
@@ -243,7 +245,7 @@ export class StepPhraser {
       event.subject === 'page'
         ? noun
         : event.subject === 'element'
-          ? this.checkedElement(event)
+          ? this.checkedElement(event, recorded)
           : event.description && this.emphasize(event.description);
     if (!subject) return undefined;
 
@@ -257,27 +259,53 @@ export class StepPhraser {
   }
 
   /**
-   * The checked element as a tester sees it: by its own readable name, else
-   * by the author's description of it, else by whatever identified it.
+   * The checked element as a tester sees it: by the readable name the test
+   * gave it, else by its name on the page as recorded, else by the author's
+   * description of it, else plainly by its kind. A check about an element's
+   * text never names it by that text: "The page shows **Saved**".
    */
-  private checkedElement(event: CheckEvent): string | undefined {
+  private checkedElement(
+    event: CheckEvent,
+    recorded: RecordedFacts,
+  ): string | undefined {
     const { target, description } = event;
-    if (description && !this.hasReadableName(target)) {
-      return this.emphasize(description);
+    if (!target && !recorded.element) {
+      return description && this.emphasize(description);
     }
-    return target && this.target(target);
+    if (this.hasReadableName(target)) return this.target(target, recorded);
+
+    const byOwnText = !TEXT_MATCHERS.has(event.matcher);
+    const name = this.namer.name(target, recorded.element, { byOwnText });
+    if (description && !name.name) return this.emphasize(description);
+    return this.target(target, recorded, {
+      byOwnText,
+      unnamed: byOwnText ? 'the element' : 'the page',
+    });
   }
 
   /** Whether a tester could find the element from how the test named it. */
   private hasReadableName(target: ElementTarget | undefined): boolean {
     if (!target) return false;
     if (target.by === 'role') return target.name !== undefined;
-    return target.by !== 'selector';
+    return target.by !== 'selector' && target.by !== 'testId';
   }
 
-  /** The element as a tester sees it, e.g. `the **Sign in** link`. */
-  target(target: ElementTarget | undefined): string {
-    if (!target) return 'the page';
+  /**
+   * The element as a tester sees it, e.g. `the **Sign in** link`. An element
+   * the test found by test id or selector is named from the page as recorded
+   * (`element`), or plainly by its kind; the selector itself is never shown.
+   */
+  target(
+    target: ElementTarget | undefined,
+    { element }: RecordedFacts = {},
+    { byOwnText = true, unnamed = 'the element' } = {},
+  ): string {
+    if (!target && !element) return 'the page';
+    if (!target || target.by === 'testId' || target.by === 'selector') {
+      return (
+        this.named(this.namer.name(target, element, { byOwnText })) ?? unnamed
+      );
+    }
 
     switch (target.by) {
       case 'role': {
@@ -294,15 +322,21 @@ export class StepPhraser {
         return `the ${this.emphasize(target.value)} field`;
       case 'altText':
         return `the ${this.emphasize(target.value)} image`;
-      case 'testId':
-        return `the ${this.emphasize(target.value.replace(/[-_]+/g, ' '))} element`;
-      case 'selector':
-        return `the ${this.emphasize(target.value)} element`;
       default: {
         const exhaustive: never = target;
         throw new Error(`Unknown target: ${JSON.stringify(exhaustive)}`);
       }
     }
+  }
+
+  /** `**Quantity**`, `the **Add to Cart** button`, or `the button`. */
+  private named({ name, noun, field }: ElementName): string | undefined {
+    if (name) {
+      return field || !noun
+        ? this.emphasize(name)
+        : `the ${this.emphasize(name)} ${noun}`;
+    }
+    return noun && `the ${noun}`;
   }
 
   private fill(wording: CheckWording, event: CheckEvent): string {

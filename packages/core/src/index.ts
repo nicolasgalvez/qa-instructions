@@ -10,6 +10,7 @@ export {
   NoScreenshots,
   type ActionCapture,
   type CheckCapture,
+  type RecordedElement,
   type Screenshot,
   type ScreenshotSource,
 } from './screenshots/source.js';
@@ -33,7 +34,12 @@ export {
   StepScreenshotHighlighter,
   type HighlightErrorHandler,
 } from './highlights/highlighter.js';
-export { StepPhraser } from './instructions/phraser.js';
+export { StepPhraser, type RecordedFacts } from './instructions/phraser.js';
+export {
+  ElementNamer,
+  type ElementName,
+  type ElementNameOptions,
+} from './instructions/element-namer.js';
 export { ScriptChangeRule } from './instructions/script-change-rule.js';
 export {
   SecretMasker,

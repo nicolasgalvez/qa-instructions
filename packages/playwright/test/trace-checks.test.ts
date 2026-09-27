@@ -25,9 +25,16 @@ const TO_BE = CheckRef.of(2, 'Expect "toBe"');
 for (const version of [8, 9, 10]) {
   test(`trace format ${version}: a check's element and expected value come from the trace`, async () => {
     const source = await TraceScreenshotSource.open(fixture(`v${version}.zip`));
-    assert.deepEqual(source.check(VISIBLE), {
-      target: { by: 'role', role: 'button', name: 'Paint' },
+    assert.deepEqual(source.check(VISIBLE)?.target, {
+      by: 'role',
+      role: 'button',
+      name: 'Paint',
     });
+    // Only the 1.56 sample has DOM snapshots (`trace: 'on'`).
+    assert.equal(
+      source.check(VISIBLE)?.element?.text,
+      version === 8 ? 'Paint' : undefined,
+    );
     assert.deepEqual(source.check(TO_BE), { expected: 'Paint' });
     assert.equal(source.check(CheckRef.of(3, 'Expect "toBe"')), undefined);
   });

@@ -313,7 +313,8 @@ test('reporter derives QA Steps from an unmodified test run', async () => {
       {
         index: 1,
         action: 'Open http://127.0.0.1:4321/',
-        expected: 'The **step marker** element shows **STEP 1**',
+        // No trace: a test id is never shown, so the text is on the page.
+        expected: 'The page shows **STEP 1**',
         url: 'http://127.0.0.1:4321/',
       },
       {
@@ -519,7 +520,7 @@ test('reporter warns where the test changed the page by script and marks forced 
       [
         {
           action:
-            'The test changed the **details:not([open])** element with a script instead of a user action. If the page does not match what comes next, change it by hand to continue.',
+            'The test changed the expandable section with a script instead of a user action. If the page does not match what comes next, change it by hand to continue.',
           warning: true,
           approximate: undefined,
         },

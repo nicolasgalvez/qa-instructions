@@ -1,0 +1,91 @@
+---
+import Base from '../layouts/Base.astro';
+
+// A store page shaped like a real Easy Digital Downloads store: several
+// product forms, each with the same unlabeled quantity field, price options
+// and Add to Cart button, told apart only by the form's id and the heading
+// inside it.
+const products = [
+  { id: 101, title: 'Water Restoration Certificates (WRC)', unit: 'WRC' },
+  { id: 102, title: 'Renewable Energy Certificates (RECs)', unit: 'RECs' },
+];
+---
+<Base title="Certificates">
+  <h1>Certificates store</h1>
+  <p class="cart-status" data-testid="cart-status">Your cart is empty</p>
+  <div class="edd_downloads_list">
+    {
+      products.map(({ id, title, unit }) => (
+        <div class="edd_download" id={`edd_download_${id}`}>
+          <form
+            id={`edd_purchase_${id}`}
+            class="edd_download_purchase_form"
+            data-title={title}
+          >
+            <div class="edd-downloads-purchase--content">
+              <h3 class="edd_download_title">{title}</h3>
+              <div class="edd-downloads-purchase--content-quantity">
+                <input
+                  class="edd-input edd-item-quantity"
+                  type="number"
+                  min="1"
+                  step="1"
+                  name="edd_download_quantity"
+                  value="1"
+                />
+              </div>
+            </div>
+            <ul class="edd_price_options">
+              <li>
+                <label>
+                  <input type="radio" name="price_id" value="1" />
+                  &nbsp;<span>{unit} (auto-renew annually)</span>
+                </label>
+              </li>
+              <li>
+                <label>
+                  <input type="radio" name="price_id" value="2" />
+                  &nbsp;<span>{unit} (one time purchase)</span>
+                </label>
+              </li>
+            </ul>
+            <button
+              type="button"
+              class="edd-downloads-purchase--product-link edd-add-to-cart"
+            >
+              <span class="edd-add-to-cart-label">Add to Cart</span>
+              <span class="edd-loading" aria-label="Loading"></span>
+            </button>
+            <input
+              type="submit"
+              class="edd-add-to-cart edd-no-js"
+              value="Add to Cart"
+              style="display: none"
+            />
+          </form>
+        </div>
+      ))
+    }
+  </div>
+  <a class="button" href="#cart" data-testid="view-cart">View cart</a>
+  <script is:inline>
+    for (const form of document.querySelectorAll('.edd_download_purchase_form')) {
+      form.querySelector('button.edd-add-to-cart').addEventListener('click', () => {
+        const quantity = form.querySelector('input[name="edd_download_quantity"]').value;
+        document.querySelector('.cart-status').textContent =
+          `${quantity} × ${form.dataset.title} in your cart`;
+      });
+    }
+  </script>
+  <style>
+    .edd_download {
+      margin: 16px 0;
+      padding: 12px;
+      border: 1px solid #999;
+    }
+    .edd_price_options {
+      list-style: none;
+      padding: 0;
+    }
+  </style>
+</Base>

@@ -1,5 +1,7 @@
 import type { ElementTarget } from '@qa-instructions/core';
 
+import { CssHint } from './css-hint.js';
+
 /** `internal:attr=[<name>=…]` engines and the target each stands for. */
 const ATTRIBUTES: Record<string, 'placeholder' | 'altText' | 'title'> = {
   placeholder: 'placeholder',
@@ -21,6 +23,8 @@ const ENGINE = /^[a-z][\w:-]*$/i;
  * the match (`nth=`, `visible=`, `internal:has-text=`) name nothing.
  */
 export class SelectorParser {
+  constructor(private readonly css = new CssHint()) {}
+
   parse(selector: string | undefined): ElementTarget | undefined {
     if (!selector) return undefined;
     const parts = this.split(selector);
@@ -40,7 +44,7 @@ export class SelectorParser {
     switch (engine) {
       case undefined:
       case 'css':
-        return body ? { by: 'selector', value: body } : undefined;
+        return body ? this.css.target(body) : undefined;
       case 'internal:role': {
         const role = /^[\w-]+/.exec(body)?.[0];
         if (!role) return undefined;
