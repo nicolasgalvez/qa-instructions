@@ -57,17 +57,6 @@ export class Screencast {
       .at(-1);
   }
 
-  /** The first frame painted at or after `from` and before `to`. */
-  firstPaintedBetween(
-    pageId: string | undefined,
-    from: number,
-    to: number,
-  ): ScreencastFrame | undefined {
-    return this.pageFrames(pageId).find(
-      (frame) => frame.paintedAt >= from && frame.paintedAt < to,
-    );
-  }
-
   /** The last frame painted after `from` and before `to`. */
   lastPaintedBetween(
     pageId: string | undefined,

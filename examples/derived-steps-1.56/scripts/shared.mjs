@@ -33,6 +33,7 @@ export const GOLDENS = [
   'moving-ui--register-a-warranty-from-the-menu',
   'cart--add-credits-to-the-cart',
   'long-page--order-boots-from-the-bottom-of-the-page',
+  'long-page--order-gift-cards-on-a-smoothly-scrolling-page',
   'certificates--add-three-recs-to-the-cart',
 ];
 

@@ -71,6 +71,12 @@ const PASSIVE_METHODS: ReadonlySet<unknown> = new Set([
  */
 const UNTRACED_SCRIPT_LOOKUP = 'waitForSelector';
 
+/**
+ * Library calls Playwright ends without scrolling to their element or
+ * sending input when the element is already as asked (a checked box).
+ */
+const SKIPPABLE_METHODS: ReadonlySet<unknown> = new Set(['check', 'uncheck']);
+
 /** The log line a pointer action writes as it starts scrolling to its element. */
 const SCROLL_LOG = /scrolling into view/;
 
@@ -98,6 +104,8 @@ type CallRecord = {
   scrollTime?: number;
   box?: QaBox;
   point?: QaPoint;
+  /** The call sent input to the page (its `input` event). */
+  inputSent?: boolean;
   /** The DOM snapshot taken as the input was sent, which dates the Action. */
   inputSnapshot?: string;
   passwordField?: boolean;
@@ -157,6 +165,7 @@ class TraceCalls {
       inputTime: this.inputTime(record),
       marks: record.point !== undefined || record.box !== undefined,
       nextChange: this.nextChange(record),
+      changedPage: this.pageChanged(record),
     };
   }
 
@@ -306,6 +315,7 @@ class TraceCalls {
       }
       case 'input':
         Object.assign(this.record(callId), {
+          inputSent: true,
           box: this.box(event.box),
           point: this.point(event.point),
           inputSnapshot:
@@ -547,13 +557,16 @@ export class TraceScreenshotSource implements ScreenshotSource {
    * `snapshots.screen`), a frame of the screen recording: the one showing
    * the moment of the Action when there is one it can be marked on, else
    * one showing the page once the call was done. An Action that touched no
-   * point (a fill) gets the latter, which shows its result.
+   * point (a fill) gets the latter, which shows its result. A check that
+   * Playwright skipped, the box being already as asked, gets none: it never
+   * scrolled to the box, so no picture is known to show it.
    */
   private static images(
     record: CallRecord,
     calls: TraceCalls,
     frames: RecordingFrames,
   ): ImageRef[] {
+    if (SKIPPABLE_METHODS.has(record.method) && !record.inputSent) return [];
     if (record.screenshots.length > 0) return record.screenshots;
     const call = calls.recorded(record);
     const action = frames.atAction(call);

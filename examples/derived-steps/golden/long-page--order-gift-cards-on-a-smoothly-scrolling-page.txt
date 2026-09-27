@@ -1,0 +1,4 @@
+1. Open http://127.0.0.1:4321/gift-cards
+2. Check **One time purchase**
+3. Type **3** into **Gift card quantity**
+4. Click the **Add gift cards to cart** button — **Added 3 gift cards to the cart** is visible
