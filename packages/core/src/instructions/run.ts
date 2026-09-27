@@ -3,6 +3,7 @@ import type { TestEvent, TestEventSink, TestStartEvent } from '../events.js';
 import type { QaRunBundle } from '../model.js';
 import type { ScreenshotSource } from '../screenshots/source.js';
 import { QaInstructionsRecorder, type QaRecording } from './recorder.js';
+import { SecretMasker } from './secret-masker.js';
 
 /** One test's QA Instructions and the directory its bundle belongs in. */
 export type QaInstructionsResult = {
@@ -33,6 +34,8 @@ export class QaInstructionsRun implements TestEventSink {
     private readonly createRecorder: () => QaInstructionsRecorder = () =>
       new QaInstructionsRecorder(),
     private readonly namer = new BundleDirNamer(),
+    /** Keeps configured secrets in test titles out of directory names. */
+    private readonly masker = new SecretMasker(),
   ) {}
 
   handle(event: TestEvent): void {
@@ -54,7 +57,7 @@ export class QaInstructionsRun implements TestEventSink {
     const names = this.namer.names(
       tests.map(({ start }) => ({
         file: start.file ?? '',
-        title: start.title,
+        title: this.masker.mask(start.title),
         project: start.project,
         line: start.line,
       })),

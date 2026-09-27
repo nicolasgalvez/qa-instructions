@@ -23,6 +23,12 @@ The screenshot adapter reads `trace.zip` itself, unzipping with `fflate`. `playw
 
 The join is: reporter `pw:api` step → the test runner's `test.trace` `before` event → the library call → its screenshots and input. Reporter steps have no id, so a step is matched by its position among the test's `pw:api` steps plus its title. Steps with a `group` (getters, configuration fixtures) are traced but never reported, so they are not counted. In version 9, library `before` events link to the step through `stepId`. In version 10 (verified with `1.64.0-alpha-2026-09-26`), the step id is itself the library `callId`, and screenshot files are named after it. The committed sample traces in `packages/playwright/test/fixtures/traces/` cover both. Any other version gives no screenshots.
 
+## Masking secrets
+
+Whether an Action typed into a password field is read from the page as the trace recorded it, not from the test code (a locator like `getByLabel('PIN')` says nothing about the field's type). With `snapshots: { dom: true }`, every library call's `frame-snapshot` events (keyed by `callId` and phase) serialize the DOM with the element the call touched marked by a `__playwright_target__` attribute, alongside its own attributes such as `type`. The trace adapter reports, per Action, whether that element is an `input` of type `password` as a neutral `passwordField` fact on the Action's capture; without DOM snapshots the fact is unknown and only configured patterns apply. Nothing fails either way.
+
+Masking itself is core logic. The recorder phrases a password Action as "Type your password into …", then masks every piece of text in the bundle (step text, Expected Results, URLs, Section and test titles) against the typed password values plus the reporter's `mask` strings and regular expressions, before the bundle is written. Every renderer reads that bundle, so every output format is masked. Playwright's own step titles and params carry typed values (`Fill "…"`), but they never reach the bundle: the adapter's Action refs contain the title only in memory. Screenshots are not masked: password inputs already render as dots, but other masked values can still show in a Step Screenshot.
+
 ## Considered Options
 
 - **Keep the fixture**: rejected; requires rewriting tests and bundling Playwright.

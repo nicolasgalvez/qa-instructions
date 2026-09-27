@@ -1,9 +1,15 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { PNG } from 'pngjs';
 
-import { GOLDENS, SCREENSHOT_GOLDENS, root } from './goldens.mjs';
+import {
+  GOLDENS,
+  OUTPUT_DIRS,
+  SCREENSHOT_GOLDENS,
+  SECRETS,
+  root,
+} from './goldens.mjs';
 
 const TOLERANCE = 8;
 
@@ -127,7 +133,31 @@ for (const goldenFile of SCREENSHOT_GOLDENS) {
   }
 }
 
+/** Fails if any written file (bundle JSON, assets, rendered text) holds a secret. */
+async function verifyNoSecrets() {
+  let scanned = 0;
+  for (const dir of OUTPUT_DIRS) {
+    const entries = await readdir(path.join(root, dir), {
+      recursive: true,
+      withFileTypes: true,
+    });
+    for (const entry of entries.filter((e) => e.isFile())) {
+      const file = path.join(entry.parentPath, entry.name);
+      const text = await readFile(file, 'latin1');
+      scanned += 1;
+      for (const secret of SECRETS) {
+        if (text.includes(secret)) {
+          fail(`${path.relative(root, file)} contains the secret "${secret}"`);
+        }
+      }
+    }
+  }
+  return scanned;
+}
+
+const scanned = await verifyNoSecrets();
+
 if (failed) process.exit(1);
 console.log(
-  `verify-run: ok (${GOLDENS.length} text golden(s), ${SCREENSHOT_GOLDENS.length} screenshot golden(s))`,
+  `verify-run: ok (${GOLDENS.length} text golden(s), ${SCREENSHOT_GOLDENS.length} screenshot golden(s), no secrets in ${scanned} file(s))`,
 );

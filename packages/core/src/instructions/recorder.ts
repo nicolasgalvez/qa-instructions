@@ -19,6 +19,7 @@ import {
 } from '../screenshots/source.js';
 import { StepPhraser } from './phraser.js';
 import { ScriptChangeRule } from './script-change-rule.js';
+import { SecretMasker } from './secret-masker.js';
 
 const USER_ACTIONS: ReadonlySet<ActionKind> = new Set<UserActionKind>([
   'navigate',
@@ -53,6 +54,11 @@ export type QaInstructionsRecorderOptions = {
   /** Default `sections`. */
   sections?: SectionPresentation;
   picker?: StepScreenshotPicker;
+  /**
+   * Masks configured secrets. Values typed into password fields are always
+   * masked as well. Default: password fields only.
+   */
+  masker?: SecretMasker;
 };
 
 /** QA Instructions plus the Step Screenshots their bundle refers to. */
@@ -66,8 +72,20 @@ const FILE_EXTENSIONS: Record<string, string> = {
   'image/jpeg': 'jpg',
 };
 
+type UserActionEvent = ActionEvent & { kind: UserActionKind };
+
+/** Actions whose value is text the test typed into a field. */
+const TYPING: ReadonlySet<ActionKind> = new Set<UserActionKind>([
+  'fill',
+  'type',
+]);
+
 type PendingStep = {
-  action: string;
+  /**
+   * The step's words, or its user Action, phrased once the screenshot source
+   * says whether it touched a password field.
+   */
+  action: string | UserActionEvent;
   url?: string;
   section?: string[];
   expectedResults: string[];
@@ -91,6 +109,11 @@ type PendingStep = {
  *
  * Given a screenshot source, each QA Step also gets the Step Screenshot of
  * its Action, and the element box and click point where known.
+ *
+ * Secrets never reach the bundle: text typed into a field the screenshot
+ * source saw was a password field is masked everywhere it appears (the step
+ * tells the tester to type their password), as is anything matching the
+ * masker's configured patterns.
  */
 export class QaInstructionsRecorder implements TestEventSink {
   private readonly steps: PendingStep[] = [];
@@ -98,6 +121,9 @@ export class QaInstructionsRecorder implements TestEventSink {
   private readonly scriptChanges: ScriptChangeRule;
   private readonly picker: StepScreenshotPicker;
   private readonly presentation: SectionPresentation;
+  private readonly masker: SecretMasker;
+  /** Text the test typed into fields, by the ref of the Action that typed it. */
+  private readonly typed: { ref: string; value: string }[] = [];
   /** Titles of the open groups, outermost first. */
   private readonly groups: string[] = [];
   /** The QA Step the open outermost group collapsed into, once it has one. */
@@ -111,6 +137,7 @@ export class QaInstructionsRecorder implements TestEventSink {
     this.scriptChanges = options.scriptChanges ?? new ScriptChangeRule();
     this.presentation = options.sections ?? 'sections';
     this.picker = options.picker ?? new StepScreenshotPicker();
+    this.masker = options.masker ?? new SecretMasker();
   }
 
   /** Which attempt of the test this recorder saw; 1 unless retried. */
@@ -179,7 +206,7 @@ export class QaInstructionsRecorder implements TestEventSink {
       const asset = screenshot && this.screenshotAsset(i + 1, screenshot);
       if (asset) builder.addAsset(asset);
       builder.addStep({
-        action: step.action,
+        action: this.phrase(step, capture),
         url: step.url,
         expected: this.expectedResult(step.expectedResults),
         section: step.section,
@@ -189,7 +216,26 @@ export class QaInstructionsRecorder implements TestEventSink {
         ...this.captureFields(capture, screenshot, asset),
       });
     });
-    return { bundle: builder.toBundle(), assets: builder.pendingAssets() };
+    const masker = this.masker.withValues(this.passwords(screenshots));
+    return {
+      bundle: masker.maskBundle(builder.toBundle()),
+      assets: builder.pendingAssets(),
+    };
+  }
+
+  /** What the test typed into fields the screenshot source saw were password fields. */
+  private passwords(screenshots: ScreenshotSource): string[] {
+    return this.typed
+      .filter(({ ref }) => screenshots.capture(ref)?.passwordField === true)
+      .map(({ value }) => value);
+  }
+
+  private phrase(step: PendingStep, capture: ActionCapture | undefined) {
+    return typeof step.action === 'string'
+      ? step.action
+      : this.phraser.action(step.action, step.url, {
+          password: capture?.passwordField === true,
+        });
   }
 
   /** Nothing after the first failure is a QA Step: the tester stops there. */
@@ -203,6 +249,9 @@ export class QaInstructionsRecorder implements TestEventSink {
       return;
     }
 
+    if (TYPING.has(event.kind) && event.value && event.ref !== undefined) {
+      this.typed.push({ ref: event.ref, value: event.value });
+    }
     const url =
       event.kind === 'navigate' ? this.resolveUrl(event.url) : undefined;
     if (this.presentation === 'collapse' && this.groups.length > 0) {
@@ -210,7 +259,7 @@ export class QaInstructionsRecorder implements TestEventSink {
       return;
     }
     this.steps.push({
-      action: this.phraser.action(event, url),
+      action: event,
       url,
       section: this.currentSection(),
       expectedResults: [],

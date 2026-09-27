@@ -15,6 +15,10 @@ export {
 export { StepScreenshotPicker } from './screenshots/picker.js';
 export { StepPhraser } from './instructions/phraser.js';
 export { ScriptChangeRule } from './instructions/script-change-rule.js';
+export {
+  SecretMasker,
+  type MaskPattern,
+} from './instructions/secret-masker.js';
 export { TestSelection, type TestSelectionOptions } from './selection.js';
 export {
   QaInstructionsRun,

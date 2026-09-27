@@ -7,6 +7,7 @@ import type {
 } from '@qa-instructions/core';
 
 import { ActionRef } from './action-ref.js';
+import { SnapshotTarget } from './snapshot-target.js';
 import { TraceArchive, type TraceEvent } from './trace-archive.js';
 
 /**
@@ -29,6 +30,7 @@ type CallRecord = {
   screenshots: { moment: QaScreenshotMoment; file: string }[];
   box?: QaBox;
   point?: QaPoint;
+  passwordField?: boolean;
 };
 
 /**
@@ -51,6 +53,10 @@ class TraceCalls {
   }
 
   private add(event: TraceEvent): void {
+    if (event.type === 'frame-snapshot') {
+      this.addSnapshot(event.snapshot);
+      return;
+    }
     const callId = event.callId;
     if (typeof callId !== 'string') return;
 
@@ -78,6 +84,20 @@ class TraceCalls {
         }
         break;
     }
+  }
+
+  /**
+   * A DOM snapshot (`snapshots.dom`) marks the element the call touched, so
+   * the page as recorded says whether it was a password field.
+   */
+  private addSnapshot(snapshot: unknown): void {
+    if (!this.isRecord(snapshot) || typeof snapshot.callId !== 'string') {
+      return;
+    }
+    const record = this.record(snapshot.callId);
+    if (record.passwordField !== undefined) return;
+    const target = SnapshotTarget.find(snapshot.html);
+    if (target) record.passwordField = target.isPasswordField;
   }
 
   private record(callId: string): CallRecord {
@@ -166,6 +186,7 @@ export class TraceScreenshotSource implements ScreenshotSource {
         }),
         box: record.box,
         point: record.point,
+        passwordField: record.passwordField,
       });
     }
     return new TraceScreenshotSource(captures);

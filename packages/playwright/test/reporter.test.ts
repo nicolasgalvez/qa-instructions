@@ -670,6 +670,116 @@ test('Step Screenshots come from the trace of the attempt that is kept', async (
   assert.equal(onlyFirstHasTrace.bundle.steps[0].assetIds, undefined);
 });
 
+// The reporter steps of test/fixtures/traces/password.spec.ts.
+const passwordSteps: StepSpec[] = [
+  sampleSteps[0],
+  { category: 'pw:api', title: 'Navigate', params: { url: 'data:text/html,' } },
+  {
+    category: 'pw:api',
+    title: 'Fill "Ada"',
+    params: { locator: "getByLabel('Name')", value: 'Ada' },
+  },
+  {
+    category: 'pw:api',
+    title: 'Fill "hunter2"',
+    params: { locator: "getByLabel('Password')", value: 'hunter2' },
+  },
+  {
+    category: 'expect',
+    title: 'Expect "toHaveValue"',
+    params: { locator: "getByLabel('Password')", expected: 'hunter2' },
+  },
+  {
+    category: 'pw:api',
+    title: 'Click',
+    params: { locator: "getByRole('button', { name: 'Sign in' })" },
+  },
+  closeContext,
+];
+
+/** Every file the reporter wrote, as text. */
+async function writtenText(dir: string): Promise<string> {
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true });
+  const files = entries.filter((entry) => entry.isFile());
+  const texts = await Promise.all(
+    files.map((file) =>
+      readFile(path.join(file.parentPath, file.name), 'latin1'),
+    ),
+  );
+  return texts.join('\n');
+}
+
+test('a value typed into a password field, as the trace recorded the page, is never written', async () => {
+  const out = await mkdtemp(path.join(tmpdir(), 'qa-reporter-'));
+  try {
+    const reporter = new QaInstructionsReporter({ outputDir: out });
+    await reporter.onTestEnd(mockTestCase(), {
+      status: 'passed',
+      retry: 0,
+      attachments: [
+        {
+          name: 'trace',
+          contentType: 'application/zip',
+          path: fileURLToPath(
+            new URL('../../test/fixtures/traces/v9-dom.zip', import.meta.url),
+          ),
+        },
+      ],
+      steps: passwordSteps.map(step),
+    } as unknown as TestResult);
+    await reporter.onEnd();
+
+    const bundle = JSON.parse(
+      await readFile(
+        path.join(out, 'sign-in--sign-in-with-bad-credentials', 'bundle.json'),
+        'utf8',
+      ),
+    ) as QaRunBundle;
+    assert.deepEqual(
+      bundle.steps.map(({ action, expected }) => ({ action, expected })),
+      [
+        { action: 'Open data:text/html,', expected: undefined },
+        { action: 'Type **Ada** into **Name**', expected: undefined },
+        {
+          action: 'Type your password into **Password**',
+          expected: '**Password** shows **[masked]**',
+        },
+        { action: 'Click the **Sign in** button', expected: undefined },
+      ],
+    );
+    assert.ok(!(await writtenText(out)).includes('hunter2'));
+  } finally {
+    await rm(out, { recursive: true, force: true });
+  }
+});
+
+test('reporter masks the values and patterns in its mask option', async () => {
+  const bundle = await runReporter(
+    [
+      navigate,
+      {
+        category: 'pw:api',
+        title: 'Fill "qa@example.com"',
+        params: { locator: "getByLabel('Email')", value: 'qa@example.com' },
+      },
+      {
+        category: 'pw:api',
+        title: 'Fill "sk-live-123"',
+        params: { locator: "getByLabel('API key')", value: 'sk-live-123' },
+      },
+    ],
+    { mask: ['sk-live-123', /[\w.+-]+@example\.com/] },
+  );
+  assert.deepEqual(
+    bundle.steps.map((s) => s.action),
+    [
+      'Open http://127.0.0.1:4321/',
+      'Type **[masked]** into **Email**',
+      'Type **[masked]** into **API key**',
+    ],
+  );
+});
+
 test('reporter never throws into the test run', async () => {
   const reporter = new QaInstructionsReporter({
     outputDir: '/dev/null/cannot-write-here',
