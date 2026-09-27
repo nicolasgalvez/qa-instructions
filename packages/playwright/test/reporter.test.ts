@@ -841,3 +841,153 @@ test('reporter never throws into the test run', async () => {
     console.warn = warn;
   }
 });
+
+/**
+ * Runs two tests through a reporter on the given Playwright version and
+ * returns what it warned, plus the first bundle's assets.
+ */
+async function warningsOfRun(
+  version: string,
+  attachments: TestResult['attachments'] = [],
+): Promise<{ warnings: string[]; assetFiles: string[]; steps: number }> {
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (message: unknown) => warnings.push(String(message));
+  const out = await mkdtemp(path.join(tmpdir(), 'qa-reporter-'));
+  try {
+    const reporter = new QaInstructionsReporter({ outputDir: out });
+    reporter.onBegin({ version } as never);
+    for (const title of ['first', 'second']) {
+      reporter.onTestEnd(
+        { ...mockTestCase(), id: title, title } as TestCase,
+        {
+          status: 'passed',
+          retry: 0,
+          attachments,
+          steps: sampleSteps.map(step),
+        } as unknown as TestResult,
+      );
+    }
+    await reporter.onEnd();
+    const dir = path.join(out, (await readdir(out)).sort()[0]);
+    const bundle = JSON.parse(
+      await readFile(path.join(dir, 'bundle.json'), 'utf8'),
+    ) as QaRunBundle;
+    return {
+      warnings,
+      assetFiles: await readdir(path.join(dir, 'assets')),
+      steps: bundle.steps.length,
+    };
+  } finally {
+    console.warn = warn;
+    await rm(out, { recursive: true, force: true });
+  }
+}
+
+test('without the trace setting, QA Instructions are text only and one warning names the line to add', async () => {
+  const { warnings, assetFiles, steps } = await warningsOfRun('1.63.0');
+  assert.equal(steps, 4);
+  assert.deepEqual(assetFiles, []);
+  assert.equal(warnings.length, 1);
+  assert.match(
+    warnings[0],
+    /use: \{ trace: \{ mode: 'on', snapshots: \{ screen: true, dom: true \} \} \}/,
+  );
+});
+
+test('before Playwright 1.63, the warning names the older trace setting', async () => {
+  const { warnings } = await warningsOfRun('1.56.1');
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /use: \{ trace: 'on' \}/);
+  assert.doesNotMatch(warnings[0], /snapshots/);
+});
+
+test('an unknown trace format yields text-only QA Instructions and one warning', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'qa-future-trace-'));
+  try {
+    const { strFromU8, strToU8, unzipSync, zipSync } = await import('fflate');
+    const entries = unzipSync(await readFile(sampleTrace[0].path as string));
+    for (const [name, data] of Object.entries(entries)) {
+      if (name.endsWith('.trace')) {
+        entries[name] = strToU8(
+          strFromU8(data).replaceAll('"version":9,', '"version":99,'),
+        );
+      }
+    }
+    const future = path.join(dir, 'trace.zip');
+    await writeFile(future, zipSync(entries));
+
+    const { warnings, assetFiles, steps } = await warningsOfRun('1.99.0', [
+      { name: 'trace', contentType: 'application/zip', path: future },
+    ]);
+    assert.equal(steps, 4);
+    assert.deepEqual(assetFiles, []);
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /trace format version 99/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('with a supported trace there is nothing to warn about', async () => {
+  const { warnings, assetFiles } = await warningsOfRun('1.63.0', sampleTrace);
+  assert.deepEqual(warnings, []);
+  assert.equal(assetFiles.length, 4);
+});
+
+test('an error in any reporter hook never reaches the test run and is logged once', async () => {
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (message: unknown) => warnings.push(String(message));
+  try {
+    const broken = {
+      testStart: () => {
+        throw new Error('broken translator');
+      },
+    } as unknown as ConstructorParameters<typeof QaInstructionsReporter>[1];
+    const reporter = new QaInstructionsReporter({}, broken);
+    reporter.onBegin(undefined as never);
+    for (const title of ['first', 'second']) {
+      reporter.onTestEnd(
+        { ...mockTestCase(), title } as TestCase,
+        {
+          status: 'passed',
+          retry: 0,
+          attachments: [],
+          steps: [],
+        } as unknown as TestResult,
+      );
+    }
+    await reporter.onEnd();
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /broken translator/);
+});
+
+test('bad reporter options never stop the test run', async () => {
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (message: unknown) => warnings.push(String(message));
+  const out = await mkdtemp(path.join(tmpdir(), 'qa-reporter-'));
+  try {
+    const reporter = new QaInstructionsReporter({
+      outputDir: out,
+      select: { files: 'tests/*.spec.ts' },
+    } as unknown as QaInstructionsReporterOptions);
+    reporter.onTestEnd(mockTestCase(), {
+      status: 'passed',
+      retry: 0,
+      attachments: [],
+      steps: [step(navigate)],
+    } as unknown as TestResult);
+    await reporter.onEnd();
+    // The bad option is ignored: every test is selected.
+    assert.equal((await readdir(out)).length, 1);
+  } finally {
+    console.warn = warn;
+    await rm(out, { recursive: true, force: true });
+  }
+  assert.equal(warnings.filter((w) => /select/.test(w)).length, 1);
+});

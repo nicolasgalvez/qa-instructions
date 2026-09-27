@@ -105,3 +105,120 @@ test('a location past the end of the file gives no call site', () => {
   const reader = new CallSiteReader(() => 'await page.evaluate(() => 1);');
   assert.equal(reader.read({ file: 'a.ts', line: 9, column: 1 }), undefined);
 });
+
+test('a literal first argument is read as written', () => {
+  assert.equal(
+    callSite(`  await page.goto('https://example.com/a?b=1');`, 'goto')
+      ?.literalArgument,
+    'https://example.com/a?b=1',
+  );
+  assert.equal(
+    callSite(`  await page.goto(PAGE);`, 'goto')?.literalArgument,
+    undefined,
+  );
+  assert.equal(
+    callSite('  await page.goto(`/items/${id}`);', 'goto')?.literalArgument,
+    undefined,
+  );
+});
+
+/**
+ * Reads the check whose matcher is `matcher`, located the way Playwright
+ * reports an `expect` step: at the matcher's name.
+ */
+function checkSite(source: string, matcher: string) {
+  const lines = source.split('\n');
+  const index = lines.findIndex((line) => line.includes(`${matcher}(`));
+  const column = lines[index].indexOf(`${matcher}(`) + 1;
+  const reader = new CallSiteReader(() => source);
+  return reader.readCheck({ file: 'spec.ts', line: index + 1, column });
+}
+
+test('a check reads its subject and expected value from the source', () => {
+  assert.deepEqual(
+    checkSite(`  await expect(page).toHaveTitle('Sign in');`, 'toHaveTitle'),
+    { subject: 'page', expected: 'Sign in' },
+  );
+  assert.deepEqual(
+    checkSite(
+      `  await expect(page.getByLabel('Username')).toBeEmpty();`,
+      'toBeEmpty',
+    ),
+    { subject: "page.getByLabel('Username')" },
+  );
+  assert.deepEqual(checkSite(`  expect(sections).toBe(2);`, 'toBe'), {
+    subject: 'sections',
+    expected: '2',
+  });
+  assert.deepEqual(
+    checkSite(
+      `  await expect(page.getByTestId('welcome-message')).toHaveText(\n    "Logged in as \\"demo\\"",\n  );`,
+      'toHaveText',
+    ),
+    {
+      subject: "page.getByTestId('welcome-message')",
+      expected: 'Logged in as "demo"',
+    },
+  );
+});
+
+test('a check split over lines, negated, or soft is read back to expect()', () => {
+  assert.deepEqual(
+    checkSite(
+      `  await expect(
+    page.getByRole('heading', { name: 'Login failed' }),
+  ).not.toBeHidden();`,
+      'toBeHidden',
+    ),
+    { subject: "page.getByRole('heading', { name: 'Login failed' })" },
+  );
+  assert.deepEqual(
+    checkSite(
+      `  await expect.soft(page.getByText('Saved'), 'saved note').toBeVisible();`,
+      'toBeVisible',
+    ),
+    { subject: "page.getByText('Saved')" },
+  );
+});
+
+test('a check whose expected value is not a literal has none', () => {
+  assert.deepEqual(
+    checkSite(`  await expect(page).toHaveURL(/login-error/);`, 'toHaveURL'),
+    { subject: 'page' },
+  );
+  assert.deepEqual(
+    checkSite(`  await expect(page).toHaveTitle(title);`, 'toHaveTitle'),
+    { subject: 'page' },
+  );
+});
+
+test('an expected value held in a constant is read from its one declaration', () => {
+  const source = `const EMAIL = 'tester@example.com';
+test('x', async ({ page }) => {
+  await expect(page.getByLabel('Username')).toHaveValue(EMAIL);
+});`;
+  assert.deepEqual(checkSite(source, 'toHaveValue'), {
+    subject: "page.getByLabel('Username')",
+    expected: 'tester@example.com',
+  });
+
+  // Declared twice (e.g. in two tests): which one applies is not read.
+  assert.deepEqual(checkSite(`const EMAIL = 'a';\n${source}`, 'toHaveValue'), {
+    subject: "page.getByLabel('Username')",
+  });
+  // Not a plain literal.
+  assert.deepEqual(
+    checkSite(
+      source.replace("'tester@example.com'", 'makeEmail()'),
+      'toHaveValue',
+    ),
+    { subject: "page.getByLabel('Username')" },
+  );
+});
+
+test('a location that is not a matcher call gives no check', () => {
+  assert.equal(
+    checkSite(`  await page.getByRole('button').click();`, 'click'),
+    undefined,
+  );
+});

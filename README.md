@@ -52,6 +52,21 @@ Give one style or a list; the default is `['outline', 'clickDot']`.
 - Warning steps, and screenshots taken after the Action (the page may have moved on), get no Highlight.
 - A screenshot that cannot be drawn on is kept unmarked, with a warning.
 
+### Setup mistakes
+
+Without the trace setting, QA Steps are text only, and the reporter prints one warning per run with the line to add. The reporter never fails the test run: a setup mistake or an error inside it is printed once on stderr, and the tests' own results are unaffected.
+
+## Playwright versions
+
+Requires `@playwright/test` 1.53 or later.
+
+| Playwright | Step details                                     | Step Screenshots                                                      | Trace setting                                                            |
+| ---------- | ------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1.63+      | Step data (`subtitle`, `params`)                 | One full-size screenshot per Action, element box and click point      | `use: { trace: { mode: 'on', snapshots: { screen: true, dom: true } } }` |
+| 1.53–1.62  | Step titles, plus each check's line in your test | The screen recording's frame from when each Action ended; click point | `use: { trace: 'on' }`                                                   |
+
+On 1.53–1.62 the QA Steps and Expected Results read the same as on 1.63; screenshots are rougher (recorded JPEG frames taken as the Action ended, so no element box and no Highlight). Two limits there: a check whose subject is a variable (`expect(button).toBeVisible()`) has no element to name, and a navigation to an absolute URL held in a variable keeps only its path. Traces in formats other than 8, 9, and 10 give text-only QA Instructions and a warning.
+
 ## What you get
 
 Each test's browser Actions (opening a URL, clicking, typing, pressing keys, choosing options) become numbered QA Steps, and the `expect` checks that follow an Action become its Expected Result. Waits, scripts, value reads, and API requests are left out because a tester cannot repeat them.
@@ -131,11 +146,13 @@ See [docs/design.md](./docs/design.md) and [ADR 0001](./docs/adr/0001-reporter-d
 
 ## CI
 
-E2E on `main` runs the verification and derived-steps examples (local fixture site + golden checks):
+E2E on `main` runs the verification and derived-steps examples (local fixture site + golden checks), including the derived-steps tests on Playwright 1.56:
 
 ```bash
 pnpm verify
 ```
+
+The 1.56 example needs its own browser build once: `cd examples/derived-steps-1.56 && pnpm exec playwright install chromium`. Its `pnpm record-fixtures` re-records the adapter's Playwright 1.56 and 1.63 step and trace fixtures.
 
 Unit CI runs `packages/*` tests only; Playwright browser tests stay in the E2E workflow.
 
@@ -143,11 +160,12 @@ Unit CI runs `packages/*` tests only; Playwright browser tests stay in the E2E w
 
 All examples are unmodified Playwright tests with the reporter added to their config.
 
-| Example                  | Purpose                                                                                                                                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `examples/verification`  | Deterministic e2e: golden bundle and QA Steps for a test-id flow                                                                                                                         |
-| `examples/derived-steps` | Role/label locators, helper functions, dropped test plumbing, and Step Screenshot and Highlight pixel probes (sticky header, hamburger menu, animated accordion; 1x and 2x; every style) |
-| `examples/basic`         | Optional smoke against playwright.dev                                                                                                                                                    |
+| Example                       | Purpose                                                                                                                                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `examples/verification`       | Deterministic e2e: golden bundle and QA Steps for a test-id flow                                                                                                                         |
+| `examples/derived-steps`      | Role/label locators, helper functions, dropped test plumbing, and Step Screenshot and Highlight pixel probes (sticky header, hamburger menu, animated accordion; 1x and 2x; every style) |
+| `examples/derived-steps-1.56` | The derived-steps tests on Playwright 1.56: same QA Steps as 1.63, screen-recording screenshots, missing-trace warning                                                                   |
+| `examples/basic`              | Optional smoke against playwright.dev                                                                                                                                                    |
 
 ```bash
 # Full pipeline verification (recommended)

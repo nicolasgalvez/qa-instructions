@@ -41,6 +41,11 @@ jobs:
         working-directory: examples/verification
       - run: pnpm e2e
         working-directory: examples/derived-steps
+      # The same tests pinned to Playwright 1.56, which needs its own browser build.
+      - run: pnpm exec playwright install chromium
+        working-directory: examples/derived-steps-1.56
+      - run: pnpm e2e
+        working-directory: examples/derived-steps-1.56
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -49,6 +54,7 @@ jobs:
           path: |
             examples/verification/qa-steps-out/
             examples/derived-steps/qa-steps-out/
+            examples/derived-steps-1.56/qa-steps-out/
 
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -58,4 +64,5 @@ jobs:
             examples/verification/playwright-report/
             examples/verification/test-results/
             examples/derived-steps/test-results/
+            examples/derived-steps-1.56/test-results/
           retention-days: 7

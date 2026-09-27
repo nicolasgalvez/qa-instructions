@@ -1,0 +1,124 @@
+{
+  "title": "Read the FAQ",
+  "steps": [
+    {
+      "title": "Before Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"browser\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Launch browser",
+              "category": "pw:api"
+            }
+          ]
+        },
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create context",
+              "category": "pw:api"
+            }
+          ]
+        },
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create page",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Navigate to \"/faq\"",
+      "category": "pw:api",
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 8,
+        "column": 14
+      }
+    },
+    {
+      "title": "Evaluate locator('details')",
+      "category": "pw:api",
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 13,
+        "column": 6
+      }
+    },
+    {
+      "title": "Expect \"toBe\"",
+      "category": "expect",
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 14,
+        "column": 20
+      }
+    },
+    {
+      "title": "Evaluate locator('details:not([open])')",
+      "category": "pw:api",
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 19,
+        "column": 6
+      }
+    },
+    {
+      "title": "Expect \"toBeVisible\"",
+      "category": "expect",
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 24,
+        "column": 5
+      }
+    },
+    {
+      "title": "Dispatch \"click\" getByRole('button', { name: 'Show contact details' })",
+      "category": "pw:api",
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 29,
+        "column": 6
+      }
+    },
+    {
+      "title": "Expect \"toBeVisible\"",
+      "category": "expect",
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 30,
+        "column": 58
+      }
+    },
+    {
+      "title": "After Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture"
+        },
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Close context",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

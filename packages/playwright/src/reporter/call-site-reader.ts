@@ -9,7 +9,23 @@ export type CallSite = {
   resultUsed: boolean;
   /** The call's options include `force: true`. */
   forced: boolean;
+  /** The call's first argument, when it is written as a plain literal (e.g. a URL). */
+  literalArgument?: string;
 };
+
+/** What the test's own source says about one `expect(subject).matcher(expected)` check. */
+export type CheckSite = {
+  /** The checked subject as written, e.g. `page.getByLabel('Username')` or `page`. */
+  subject: string;
+  /** The matcher's first argument, when it is written as a plain literal. */
+  expected?: string;
+};
+
+/** Callees whose call starts a check: `expect(...)`, `expect.soft(...)`, `expect.poll(...)`. */
+const EXPECT_MODIFIERS = new Set(['soft', 'poll']);
+
+/** Words between `expect(...)` and the matcher: `.not`, `.resolves`, `.rejects`. */
+const MATCHER_PREFIXES = new Set(['not', 'resolves', 'rejects']);
 
 /** Words that end an expression when reading backward from a call. */
 const PREFIX_KEYWORDS = new Set([
@@ -33,6 +49,9 @@ const STATEMENT_KEYWORDS = new Set(['else', 'do']);
 
 const FORCE_OPTION = /\bforce\s*:\s*true\b/;
 
+/** Start (inclusive) and end (exclusive) offsets in a source. */
+type Range = { start: number; end: number };
+
 function defaultReadSource(file: string): string | undefined {
   try {
     return readFileSync(file, 'utf8');
@@ -49,7 +68,8 @@ class MaskedSource {
   readonly text: string;
   private readonly lineStarts: number[] = [0];
 
-  constructor(source: string) {
+  constructor(readonly original: string) {
+    const source = original;
     this.text = this.mask(source);
     for (let i = 0; i < source.length; i += 1) {
       if (source[i] === '\n') this.lineStarts.push(i + 1);
@@ -119,10 +139,117 @@ export class CallSiteReader {
     const offset = source?.offsetOf(location.line, location.column);
     if (!source || offset === undefined) return undefined;
 
+    const args = this.argumentsOf(source.text, offset);
+    const literal =
+      args && this.valueOf(source, this.firstArgument(source, args));
     return {
       resultUsed: this.resultUsed(source.text, offset),
-      forced: FORCE_OPTION.test(this.argumentsOf(source.text, offset)),
+      forced: args
+        ? FORCE_OPTION.test(source.text.slice(args.start, args.end))
+        : false,
+      ...(literal === undefined ? {} : { literalArgument: literal }),
     };
+  }
+
+  /**
+   * Reads the check whose matcher Playwright located at `location`, in
+   * `expect(subject)[.not].matcher(expected)`.
+   */
+  readCheck(location: SourceLocation): CheckSite | undefined {
+    const source = this.source(location.file);
+    const offset = source?.offsetOf(location.line, location.column);
+    if (!source || offset === undefined) return undefined;
+    const { text } = source;
+
+    let i = this.skipSpaceBack(text, offset);
+    for (;;) {
+      if (text[i - 1] !== '.') return undefined;
+      i = this.skipSpaceBack(text, i - 1);
+      const word = this.wordBefore(text, i);
+      if (!MATCHER_PREFIXES.has(word)) break;
+      i = this.skipSpaceBack(text, i - word.length);
+    }
+    if (text[i - 1] !== ')') return undefined;
+
+    const open = this.openerOf(text, i - 1);
+    if (!this.isExpectCallee(text, this.skipSpaceBack(text, open))) {
+      return undefined;
+    }
+    const subject = this.firstArgument(source, { start: open + 1, end: i - 1 });
+    const matcherArgs = this.argumentsOf(text, offset);
+    const expected =
+      matcherArgs &&
+      this.valueOf(source, this.firstArgument(source, matcherArgs));
+    return expected === undefined ? { subject } : { subject, expected };
+  }
+
+  /** `expect`, `expect.soft`, or `expect.poll` ends just before `end`. */
+  private isExpectCallee(text: string, end: number): boolean {
+    const word = this.wordBefore(text, end);
+    if (word === 'expect') return true;
+    if (!EXPECT_MODIFIERS.has(word)) return false;
+    const dot = this.skipSpaceBack(text, end - word.length);
+    return (
+      text[dot - 1] === '.' &&
+      this.wordBefore(text, this.skipSpaceBack(text, dot - 1)) === 'expect'
+    );
+  }
+
+  /** The first argument in `range`, as written in the original source. */
+  private firstArgument(source: MaskedSource, range: Range): string {
+    const { text } = source;
+    let depth = 0;
+    let end = range.start;
+    for (; end < range.end; end += 1) {
+      if ('([{'.includes(text[end])) depth += 1;
+      else if (')]}'.includes(text[end])) depth -= 1;
+      else if (text[end] === ',' && depth === 0) break;
+    }
+    return source.original.slice(range.start, end).trim();
+  }
+
+  /**
+   * The value an argument is written as: a plain literal, or a constant
+   * declared once in the file with a plain literal (`const EMAIL = '…'`).
+   */
+  private valueOf(source: MaskedSource, written: string): string | undefined {
+    return this.literal(written) ?? this.constant(source, written);
+  }
+
+  private constant(source: MaskedSource, name: string): string | undefined {
+    if (!/^[A-Za-z_$][\w$]*$/.test(name)) return undefined;
+    const { text } = source;
+    const declarations = [
+      ...text.matchAll(
+        new RegExp(`\\bconst\\s+${name.replaceAll('$', '\\$')}\\s*=`, 'g'),
+      ),
+    ];
+    if (declarations.length !== 1) return undefined;
+
+    const start = declarations[0].index + declarations[0][0].length;
+    let depth = 0;
+    let end = start;
+    for (; end < text.length; end += 1) {
+      const c = text[end];
+      if ('([{'.includes(c)) depth += 1;
+      else if (')]}'.includes(c)) {
+        if (depth === 0) break;
+        depth -= 1;
+      } else if (depth === 0 && ';,\n'.includes(c)) break;
+    }
+    return this.literal(source.original.slice(start, end).trim());
+  }
+
+  /** The value of a plain string, number, or boolean literal; otherwise undefined. */
+  private literal(written: string): string | undefined {
+    const quoted = /^(['"])((?:\\.|(?!\1)[^\\])*)\1$/s.exec(written);
+    if (quoted) return quoted[2].replace(/\\(.)/g, '$1');
+    const template = /^`((?:\\.|[^`\\$]|\$(?!\{))*)`$/s.exec(written);
+    if (template) return template[1].replace(/\\(.)/g, '$1');
+    if (/^-?\d+(\.\d+)?$/.test(written) || /^(true|false)$/.test(written)) {
+      return written;
+    }
+    return undefined;
   }
 
   private source(file: string): MaskedSource | undefined {
@@ -192,13 +319,13 @@ export class CallSiteReader {
     }
   }
 
-  /** Text inside the call's parentheses, e.g. `{ force: true }`. */
-  private argumentsOf(text: string, methodStart: number): string {
+  /** Where the text inside the call's parentheses is, e.g. `{ force: true }`. */
+  private argumentsOf(text: string, methodStart: number): Range | undefined {
     let i = methodStart;
     while (i < text.length && this.isIdentifierChar(text[i])) i += 1;
     while (i < text.length && /\s/.test(text[i])) i += 1;
-    if (text[i] !== '(') return '';
-    return text.slice(i + 1, this.closerOf(text, i));
+    if (text[i] !== '(') return undefined;
+    return { start: i + 1, end: this.closerOf(text, i) };
   }
 
   private openerOf(text: string, close: number): number {
