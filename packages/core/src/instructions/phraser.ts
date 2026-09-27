@@ -112,6 +112,31 @@ export class StepPhraser {
   }
 
   /**
+   * The warning a tester reads where the test changed the page with a
+   * script instead of a user action.
+   */
+  scriptChange(event: ActionEvent): string {
+    const byScript = 'with a script instead of a user action.';
+    const byHand =
+      'If the page does not match what comes next, you may need to do something by hand to continue.';
+    const target = this.target(event.target);
+
+    if (event.kind === 'dispatch') {
+      if (event.value === 'click' && event.target) {
+        return `The test clicked ${target} ${byScript} Click it yourself to continue.`;
+      }
+      const type = event.value
+        ? `${/^[aeiou]/i.test(event.value) ? 'an' : 'a'} ${this.emphasize(event.value)} event`
+        : 'an event';
+      return `The test sent ${type} to ${target} ${byScript} ${byHand}`;
+    }
+
+    return event.target
+      ? `The test changed ${target} ${byScript} If the page does not match what comes next, change it by hand to continue.`
+      : `The test changed the page ${byScript} ${byHand}`;
+  }
+
+  /**
    * The "you should see" phrase for a check, starting lowercase so several
    * can be joined. Undefined when a tester could not see what was checked.
    */

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -17,6 +17,7 @@ type StepSpec = {
   subtitle?: string;
   params?: Record<string, unknown>;
   error?: { message: string };
+  location?: { file: string; line: number; column: number };
   steps?: StepSpec[];
 };
 
@@ -315,19 +316,27 @@ test('reporter derives QA Steps from an unmodified test run', async () => {
         url: undefined,
       },
       {
+        // No call site to tell whether the script only read the page.
         index: 3,
-        action: 'Type **demo-user** into **Username**',
+        action:
+          'The test changed the page with a script instead of a user action. If the page does not match what comes next, you may need to do something by hand to continue.',
         expected: undefined,
         url: undefined,
       },
       {
         index: 4,
+        action: 'Type **demo-user** into **Username**',
+        expected: undefined,
+        url: undefined,
+      },
+      {
+        index: 5,
         action: 'Click the **submit** button',
         expected: "**It's broken** is visible",
         url: undefined,
       },
       {
-        index: 5,
+        index: 6,
         action: 'Press **Tab**',
         expected: undefined,
         url: undefined,
@@ -439,6 +448,90 @@ test('reporter passes the testSteps presentation option to the core', async () =
     (await runReporter(groupedSteps, { testSteps: 'ignore' })).steps.length,
     3,
   );
+});
+
+test('reporter warns where the test changed the page by script and marks forced Actions', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'qa-spec-'));
+  const file = path.join(dir, 'faq.spec.ts');
+  const lines = [
+    `test('FAQ', async ({ page }) => {`,
+    `  await page.locator('details:not([open])').evaluateAll((els) => els.forEach((d) => (d.open = true)));`,
+    `  const count = await page.locator('details').evaluateAll((els) => els.length);`,
+    `  await page.getByRole('button', { name: 'Show contact details' }).dispatchEvent('click');`,
+    `  await page.getByRole('button', { name: 'Subscribe' }).click({ force: true });`,
+    `});`,
+  ];
+  await writeFile(file, lines.join('\n'));
+  const at = (line: number, method: string) => ({
+    file,
+    line,
+    column: lines[line - 1].indexOf(`${method}(`) + 1,
+  });
+
+  try {
+    const bundle = await runReporter([
+      {
+        category: 'pw:api',
+        title: 'Evaluate',
+        subtitle: "locator('details:not([open])')",
+        params: { locator: "locator('details:not([open])')" },
+        location: at(2, 'evaluateAll'),
+      },
+      {
+        category: 'pw:api',
+        title: 'Evaluate',
+        subtitle: "locator('details')",
+        params: { locator: "locator('details')" },
+        location: at(3, 'evaluateAll'),
+      },
+      {
+        category: 'pw:api',
+        title: 'Dispatch "click"',
+        subtitle: "getByRole('button', { name: 'Show contact details' })",
+        params: {
+          locator: "getByRole('button', { name: 'Show contact details' })",
+          type: 'click',
+        },
+        location: at(4, 'dispatchEvent'),
+      },
+      {
+        category: 'pw:api',
+        title: 'Click',
+        subtitle: "getByRole('button', { name: 'Subscribe' })",
+        params: { locator: "getByRole('button', { name: 'Subscribe' })" },
+        location: at(5, 'click'),
+      },
+    ]);
+
+    assert.deepEqual(
+      bundle.steps.map(({ action, warning, approximate }) => ({
+        action,
+        warning,
+        approximate,
+      })),
+      [
+        {
+          action:
+            'The test changed the **details:not([open])** element with a script instead of a user action. If the page does not match what comes next, change it by hand to continue.',
+          warning: true,
+          approximate: undefined,
+        },
+        {
+          action:
+            'The test clicked the **Show contact details** button with a script instead of a user action. Click it yourself to continue.',
+          warning: true,
+          approximate: undefined,
+        },
+        {
+          action: 'Click the **Subscribe** button',
+          warning: undefined,
+          approximate: true,
+        },
+      ],
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('reporter never throws into the test run', async () => {

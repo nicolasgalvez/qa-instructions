@@ -15,6 +15,12 @@ _Avoid_: test step (that is Playwright's `test.step`)
 **Action**:
 The "do this" half of a QA Step: something a person can do in a browser, such as opening a URL, clicking, typing, choosing an option, or pressing a key. Test plumbing that a person cannot repeat (waits, scripts, reading values) is never an Action.
 
+**Warning step**:
+A QA Step placed where the test changed the page with a script instead of a user action (e.g. force-opening an accordion), telling the tester they may need to do something by hand to continue. It has no Highlight.
+
+**Approximate**:
+Said of an Action the test forced past the runner's usual checks (`force: true`); its Highlight may not line up.
+
 **Expected Result**:
 The "you should see" half of a QA Step, taken from the test's own checks that follow the Action. A QA Step may have none.
 _Avoid_: assertion (that is the test's code, not what the tester reads)

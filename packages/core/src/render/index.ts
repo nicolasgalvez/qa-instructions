@@ -32,9 +32,15 @@ export function renderQaSteps(bundle: QaRunBundle): string {
       if (title) lines.push(`### ${title}`);
       section = title;
     }
+    const warning = step.warning ? 'Warning: ' : '';
+    const approximate = step.approximate
+      ? ' (approximate: the test forced this Action past its usual checks, so its highlight may not line up)'
+      : '';
     const expected = step.expected ? ` — ${step.expected}` : '';
     const failed = step.failed ? ' (**test failed here**)' : '';
-    lines.push(`${step.index}. ${step.action}${expected}${failed}`);
+    lines.push(
+      `${step.index}. ${warning}${step.action}${approximate}${expected}${failed}`,
+    );
   }
 
   return lines.join('\n').trimEnd() + '\n';

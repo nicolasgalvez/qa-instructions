@@ -6,6 +6,7 @@ export {
   type SectionPresentation,
 } from './instructions/recorder.js';
 export { StepPhraser } from './instructions/phraser.js';
+export { ScriptChangeRule } from './instructions/script-change-rule.js';
 export { TestSelection, type TestSelectionOptions } from './selection.js';
 export {
   QaInstructionsRun,

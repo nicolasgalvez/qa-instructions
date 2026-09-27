@@ -228,3 +228,28 @@ test('a Section heading follows the prerequisite with one blank line', () => {
     'Deploy to dev first.\n\n### Add\n1. Click the **Add** button\n',
   );
 });
+
+test('a warning step sits in its Section, in sequence, in every mode', () => {
+  const scripted: TestEvent[] = [
+    groupStart('Read the FAQ'),
+    click('Show answers'),
+    { type: 'action', kind: 'script', resultUsed: false },
+    visible('Shipping'),
+    click('Close'),
+    groupEnd('Read the FAQ'),
+  ];
+  const warning =
+    'Warning: The test changed the page with a script instead of a user action. If the page does not match what comes next, you may need to do something by hand to continue. — The **Shipping** heading is visible';
+
+  assert.equal(
+    renderQaSteps(record('sections', ...scripted)),
+    '### Read the FAQ\n' +
+      '1. Click the **Show answers** button\n' +
+      `2. ${warning}\n` +
+      '3. Click the **Close** button\n',
+  );
+  assert.equal(
+    renderQaSteps(record('collapse', ...scripted)),
+    `1. Read the FAQ\n2. ${warning}\n3. Read the FAQ\n`,
+  );
+});

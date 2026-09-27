@@ -1,0 +1,27 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Newsletter">
+  <h1>Newsletter</h1>
+  <p>The Subscribe button never stops moving, so a test has to force its click.</p>
+  <button type="button" class="button wobble" id="subscribe">Subscribe</button>
+  <p id="subscribed" hidden>Thanks for subscribing</p>
+  <style>
+    .wobble {
+      animation: wobble 1s linear infinite alternate;
+    }
+    @keyframes wobble {
+      from {
+        transform: translateX(0);
+      }
+      to {
+        transform: translateX(6px);
+      }
+    }
+  </style>
+  <script is:inline>
+    document.getElementById('subscribe').addEventListener('click', () => {
+      document.getElementById('subscribed').hidden = false;
+    });
+  </script>
+</Base>

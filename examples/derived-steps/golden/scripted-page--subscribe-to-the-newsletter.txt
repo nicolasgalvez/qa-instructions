@@ -1,0 +1,2 @@
+1. Open http://127.0.0.1:4321/newsletter
+2. Click the **Subscribe** button (approximate: the test forced this Action past its usual checks, so its highlight may not line up) — **Thanks for subscribing** is visible

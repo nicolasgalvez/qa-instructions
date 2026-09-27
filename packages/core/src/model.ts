@@ -15,6 +15,10 @@ export type QaStep = {
   section?: string[];
   /** True on the QA Step where the test failed. */
   failed?: boolean;
+  /** The test changed the page by script here; the tester may need to act by hand. Has no Highlight. */
+  warning?: boolean;
+  /** The Action was forced past the runner's usual checks; its Highlight may not line up. */
+  approximate?: boolean;
 };
 
 export type QaRunBundle = {
@@ -51,6 +55,8 @@ export type QaStepInput = {
   assetIds?: string[];
   section?: string[];
   failed?: boolean;
+  warning?: boolean;
+  approximate?: boolean;
 };
 
 export type QaAssetInput = {
