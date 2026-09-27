@@ -35,7 +35,7 @@ A named group of QA Steps, taken from a test's own grouping of its actions.
 The picture of the page at the moment of a QA Step's Action, with a Highlight on the element acted on.
 
 **Highlight**:
-The mark drawn on a Step Screenshot to show which element the Action touched and, for clicks, where. Its style is configurable.
+The mark drawn on a Step Screenshot to show which element the Action touched and, for clicks, where. Its style is configurable. An Approximate Action's outline is dashed.
 _Avoid_: annotation (overloaded with Playwright test annotations)
 
 ## Example dialogue

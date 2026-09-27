@@ -45,6 +45,7 @@ export function createBundleBuilder(): BundleBuilder {
         screenshotMoment: input.screenshotMoment,
         elementBox: input.elementBox,
         clickPoint: input.clickPoint,
+        viewport: input.viewport,
       };
       steps.push(step);
       return step;

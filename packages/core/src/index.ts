@@ -13,6 +13,25 @@ export {
   type ScreenshotSource,
 } from './screenshots/source.js';
 export { StepScreenshotPicker } from './screenshots/picker.js';
+export type {
+  BadgeMark,
+  ClickDotMark,
+  Highlight,
+  HighlightRect,
+  OutlineMark,
+  ScreenshotAnnotator,
+  SpotlightMark,
+  StepImage,
+} from './highlights/annotator.js';
+export {
+  DEFAULT_HIGHLIGHT,
+  HighlightPlanner,
+  type HighlightStyle,
+} from './highlights/planner.js';
+export {
+  StepScreenshotHighlighter,
+  type HighlightErrorHandler,
+} from './highlights/highlighter.js';
 export { StepPhraser } from './instructions/phraser.js';
 export { ScriptChangeRule } from './instructions/script-change-rule.js';
 export {

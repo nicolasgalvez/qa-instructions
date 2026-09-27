@@ -5,7 +5,7 @@
  * for an Action by the Action's `ref`. Nothing here may depend on a test
  * runner's or trace format's types.
  */
-import type { QaBox, QaPoint, QaScreenshotMoment } from '../model.js';
+import type { QaBox, QaPoint, QaScreenshotMoment, QaSize } from '../model.js';
 
 export type Screenshot = {
   moment: QaScreenshotMoment;
@@ -26,6 +26,8 @@ export type ActionCapture = {
    * was recorded (not as the test code suggests). Undefined when unknown.
    */
   passwordField?: boolean;
+  /** The page's viewport when the screenshots were taken, in CSS pixels. */
+  viewport?: QaSize;
 };
 
 export interface ScreenshotSource {

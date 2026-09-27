@@ -1,0 +1,7 @@
+1. Open http://127.0.0.1:4321/store
+2. Click the **Menu** button
+3. Click the **Warranty** link
+4. Click the **Warranty** button
+5. Type **SN-1234** into **Serial number**
+6. Press **Enter** — **Registered** is visible
+7. Click the **Menu** button

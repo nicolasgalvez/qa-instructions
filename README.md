@@ -26,7 +26,31 @@ That is the whole setup. Run your tests as usual (`npx playwright test`); the re
 
 `@playwright/test` is a peer dependency used for types only, so the package always runs against your project's own Playwright and never loads a second copy.
 
-With the trace setting on, each QA Step gets a Step Screenshot of the page at the moment of its Action, saved in the bundle's `assets/` and listed in the step's `assetIds`. The element acted on (`elementBox`) and, for clicks, the click point (`clickPoint`) are recorded on the step in viewport CSS pixels. Without the setting, QA Steps are text only.
+With the trace setting on, each QA Step gets a Step Screenshot of the page at the moment of its Action, saved in the bundle's `assets/` and listed in the step's `assetIds`. The element acted on (`elementBox`), for clicks the click point (`clickPoint`), and the page's `viewport` are recorded on the step in CSS pixels. Without the setting, QA Steps are text only.
+
+### Highlights
+
+Each Step Screenshot carries a Highlight on the element its Action touched: by default a pink outline 2px clear of the element, and for clicks a white-ringed dot where the click landed. Fills get the outline only; navigation and key presses touch no element and get none. Choose the look with the reporter's `highlight` option:
+
+```typescript
+['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs', highlight: ['outline', 'badge'] }],
+```
+
+| Style       | Look                                                     |
+| ----------- | -------------------------------------------------------- |
+| `outline`   | A 3px frame around the element                           |
+| `clickDot`  | A dot at the click point (clicks and taps only)          |
+| `badge`     | The QA Step's number in a circle on the element's corner |
+| `spotlight` | Everything but the element dimmed                        |
+| `none`      | No marks                                                 |
+
+Give one style or a list; the default is `['outline', 'clickDot']`.
+
+- Highlights are drawn when the bundle is written, after the run; nothing is injected into the browser. The highlighted image replaces the original in `assets/`, and the bundle's asset lists the marks it carries (`"highlight": ["outline", "clickDot"]`). Use `highlight: 'none'` to keep screenshots unmarked.
+- Positions are scaled from the viewport to the image, so high-DPI (`deviceScaleFactor: 2`) screenshots are marked in the right place.
+- An approximate step (a forced click) gets a dashed outline: the element may have moved.
+- Warning steps, and screenshots taken after the Action (the page may have moved on), get no Highlight.
+- A screenshot that cannot be drawn on is kept unmarked, with a warning.
 
 ## What you get
 
@@ -99,11 +123,11 @@ See [docs/design.md](./docs/design.md) and [ADR 0001](./docs/adr/0001-reporter-d
 
 ## Packages
 
-| Package                       | Role                                                                             |
-| ----------------------------- | -------------------------------------------------------------------------------- |
-| `@qa-instructions/core`       | Runner-independent core: test event port, QA Steps, bundle model, I/O, renderers |
-| `@qa-instructions/playwright` | Playwright reporter adapter (`@qa-instructions/playwright/reporter`)             |
-| `@qa-instructions/cli`        | `qa-instructions render` command                                                 |
+| Package                       | Role                                                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------------------- |
+| `@qa-instructions/core`       | Runner-independent core: test event port, QA Steps, bundle model, I/O, renderers                  |
+| `@qa-instructions/playwright` | Playwright reporter adapter (`@qa-instructions/playwright/reporter`); draws Highlights with sharp |
+| `@qa-instructions/cli`        | `qa-instructions render` command                                                                  |
 
 ## CI
 
@@ -119,11 +143,11 @@ Unit CI runs `packages/*` tests only; Playwright browser tests stay in the E2E w
 
 All examples are unmodified Playwright tests with the reporter added to their config.
 
-| Example                  | Purpose                                                                                        |
-| ------------------------ | ---------------------------------------------------------------------------------------------- |
-| `examples/verification`  | Deterministic e2e: golden bundle and QA Steps for a test-id flow                               |
-| `examples/derived-steps` | Role/label locators, helper functions, dropped test plumbing, and Step Screenshot pixel probes |
-| `examples/basic`         | Optional smoke against playwright.dev                                                          |
+| Example                  | Purpose                                                                                                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `examples/verification`  | Deterministic e2e: golden bundle and QA Steps for a test-id flow                                                                                                                         |
+| `examples/derived-steps` | Role/label locators, helper functions, dropped test plumbing, and Step Screenshot and Highlight pixel probes (sticky header, hamburger menu, animated accordion; 1x and 2x; every style) |
+| `examples/basic`         | Optional smoke against playwright.dev                                                                                                                                                    |
 
 ```bash
 # Full pipeline verification (recommended)

@@ -29,6 +29,15 @@ Whether an Action typed into a password field is read from the page as the trace
 
 Masking itself is core logic. The recorder phrases a password Action as "Type your password into …", then masks every piece of text in the bundle (step text, Expected Results, URLs, Section and test titles) against the typed password values plus the reporter's `mask` strings and regular expressions, before the bundle is written. Every renderer reads that bundle, so every output format is masked. Playwright's own step titles and params carry typed values (`Fill "…"`), but they never reach the bundle: the adapter's Action refs contain the title only in memory. Screenshots are not masked: password inputs already render as dots, but other masked values can still show in a Step Screenshot.
 
+## Highlights
+
+The core decides what a Highlight marks and where (`HighlightPlanner`); a screenshot-annotator port paints it, and the default adapter composites an SVG overlay with sharp. sharp is a dependency of the Playwright package, never the core. Decisions:
+
+- **Scale from the image, not the device.** The element box and click point are viewport CSS pixels. The planner scales them by the image's size over the viewport's (read from the trace's context options), so it stays right whatever pixel density the screenshot has. Playwright 1.63 writes `snapshots.screen` images at CSS scale even with `deviceScaleFactor: 2`, so the scale is 1 there today.
+- **Drawn after the run, replacing the original.** Highlighting happens as each bundle is written; the highlighted image replaces the original, and the bundle's asset records its marks. Keeping both would double every bundle for a view only `highlight: 'none'` needs.
+- **Only on screenshots that match the box.** The box is read at the moment of the Action. Action-moment and before-moment screenshots are highlighted; after-moment ones are not, since the page may have navigated or closed a menu.
+- **Warning steps get none; approximate steps get a dashed outline.** A forced Action's element may have moved while it was clicked, so the outline is drawn where the element was, dashed to say so, and the step's text says the highlight may not line up.
+
 ## Considered Options
 
 - **Keep the fixture**: rejected; requires rewriting tests and bundling Playwright.

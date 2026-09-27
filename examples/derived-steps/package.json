@@ -4,13 +4,14 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
+    "test:2x": "playwright test --config playwright.2x.config.ts",
     "test:failing": "node scripts/run-failing.mjs",
     "render": "node scripts/render.mjs qa-runs:qa-steps-out qa-runs/collapse:qa-steps-out/collapse qa-runs/ignore:qa-steps-out/ignore",
     "render:failing": "node scripts/render.mjs qa-runs/failing:qa-steps-out/failing",
     "verify": "node scripts/verify-run.mjs",
     "verify:update-goldens": "node scripts/update-goldens.mjs",
     "e2e:selection": "rm -rf qa-runs-selection && playwright test --config playwright.selection.config.ts && node scripts/verify-selection.mjs",
-    "e2e": "pnpm test && pnpm test:failing && pnpm render && pnpm render:failing && pnpm verify && pnpm e2e:selection"
+    "e2e": "pnpm test && pnpm test:2x && pnpm test:failing && pnpm render && pnpm render:failing && pnpm verify && pnpm e2e:selection"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

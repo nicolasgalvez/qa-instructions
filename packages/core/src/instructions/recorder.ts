@@ -360,6 +360,7 @@ export class QaInstructionsRecorder implements TestEventSink {
       screenshotMoment: screenshot?.moment,
       elementBox: capture?.box,
       clickPoint: capture?.point,
+      viewport: screenshot && capture?.viewport,
     };
   }
 

@@ -1,0 +1,203 @@
+---
+import Base from '../layouts/Base.astro';
+
+const intro = [
+  'Browse the help topics below, or open the menu to jump straight to one.',
+  'Every topic opens in place. The header stays at the top as you scroll.',
+];
+---
+<Base title="Store help">
+  <header slot="header" class="site-header">
+    <span class="brand">Fixture Store</span>
+    <button
+      type="button"
+      class="hamburger"
+      id="menu-button"
+      aria-label="Menu"
+      aria-expanded="false"
+      aria-controls="site-menu"
+    >
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+  <nav id="site-menu" class="site-menu" aria-label="Site menu">
+    <a href="#shipping">Shipping</a>
+    <a href="#returns">Returns</a>
+    <a href="#warranty">Warranty</a>
+  </nav>
+
+  <h1>Store help</h1>
+  {intro.map((text) => <p>{text}</p>)}
+  <div class="spacer" aria-hidden="true"></div>
+
+  <section class="accordion">
+    <div class="topic" id="shipping">
+      <h2>
+        <button type="button" class="trigger" aria-expanded="false" aria-controls="shipping-panel">
+          Shipping
+        </button>
+      </h2>
+      <div class="panel" id="shipping-panel" role="region" aria-label="Shipping">
+        <div class="panel-body"><p>Orders ship within 2 business days.</p></div>
+      </div>
+    </div>
+    <div class="topic" id="returns">
+      <h2>
+        <button type="button" class="trigger" aria-expanded="false" aria-controls="returns-panel">
+          Returns
+        </button>
+      </h2>
+      <div class="panel" id="returns-panel" role="region" aria-label="Returns">
+        <div class="panel-body"><p>Returns are free for 30 days.</p></div>
+      </div>
+    </div>
+    <div class="topic" id="warranty">
+      <h2>
+        <button type="button" class="trigger" aria-expanded="false" aria-controls="warranty-panel">
+          Warranty
+        </button>
+      </h2>
+      <div class="panel" id="warranty-panel" role="region" aria-label="Warranty">
+        <div class="panel-body">
+          <p>Register your product for a two-year warranty.</p>
+          <form id="warranty-form">
+            <label>
+              Serial number
+              <input name="serial" type="text" />
+            </label>
+          </form>
+          <p id="registered" hidden>Registered</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <div class="spacer" aria-hidden="true"></div>
+
+  <style>
+    :global(html) {
+      scroll-behavior: auto;
+    }
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      height: 56px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #222222;
+      color: #fff;
+      font-weight: 700;
+    }
+    .hamburger {
+      width: 44px;
+      height: 40px;
+      padding: 10px;
+      border: none;
+      background: #444444;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+    .hamburger span {
+      display: block;
+      height: 3px;
+      background: #fff;
+    }
+    .site-menu {
+      position: fixed;
+      top: 56px;
+      left: 0;
+      bottom: 0;
+      z-index: 9;
+      width: 240px;
+      padding: 16px;
+      box-sizing: border-box;
+      background: #10244f;
+      transform: translateX(-100%);
+      transition: transform 400ms ease-out;
+    }
+    .site-menu.open {
+      transform: translateX(0);
+    }
+    .site-menu a {
+      display: block;
+      margin-bottom: 12px;
+      padding: 12px 16px;
+      background: #2d5be3;
+      color: #fff;
+      text-decoration: none;
+    }
+    .spacer {
+      height: 700px;
+    }
+    .topic {
+      scroll-margin-top: 72px;
+    }
+    .topic h2 {
+      margin: 0 0 8px;
+    }
+    .trigger {
+      width: 100%;
+      padding: 12px 16px;
+      border: none;
+      background: #0a7d5a;
+      color: #fff;
+      font: inherit;
+      font-size: 18px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .panel {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 400ms ease-out;
+    }
+    .panel.open {
+      grid-template-rows: 1fr;
+    }
+    .panel-body {
+      overflow: hidden;
+    }
+    .panel-body input {
+      display: block;
+      width: 240px;
+      margin-top: 8px;
+      padding: 8px;
+      border: 2px solid #111;
+      font: inherit;
+    }
+  </style>
+  <script is:inline>
+    const menuButton = document.getElementById('menu-button');
+    const menu = document.getElementById('site-menu');
+    const setMenu = (open) => {
+      menu.classList.toggle('open', open);
+      menuButton.setAttribute('aria-expanded', String(open));
+    };
+    menuButton.addEventListener('click', () =>
+      setMenu(!menu.classList.contains('open')),
+    );
+    menu.addEventListener('click', (event) => {
+      if (event.target.closest('a')) setMenu(false);
+    });
+
+    for (const trigger of document.querySelectorAll('.trigger')) {
+      trigger.addEventListener('click', () => {
+        const panel = document.getElementById(
+          trigger.getAttribute('aria-controls'),
+        );
+        const open = !panel.classList.contains('open');
+        panel.classList.toggle('open', open);
+        trigger.setAttribute('aria-expanded', String(open));
+      });
+    }
+
+    document.getElementById('warranty-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      document.getElementById('registered').hidden = false;
+    });
+  </script>
+</Base>

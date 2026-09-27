@@ -133,6 +133,22 @@ test('the element box and click point of an Action are kept on its QA Step', () 
   assert.equal(bundle.steps[0].assetIds, undefined);
 });
 
+test('the viewport the screenshot shows is kept on the QA Step, to scale its Highlight', () => {
+  const { bundle } = record(
+    new MapScreenshotSource({
+      click: {
+        screenshots: [
+          { moment: 'action', contentType: 'image/png', data: png('action') },
+        ],
+        viewport: { width: 800, height: 600 },
+      },
+    }),
+    click,
+  );
+
+  assert.deepEqual(bundle.steps[0].viewport, { width: 800, height: 600 });
+});
+
 test('a before-only capture still gives the QA Step a screenshot', () => {
   const { assets } = record(
     new MapScreenshotSource({

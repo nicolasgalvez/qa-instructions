@@ -6,6 +6,15 @@ const baseURL = 'http://127.0.0.1:4321';
 // test accounts' email addresses.
 const mask = [/[\w.+-]+@qa\.example\.com/];
 
+/** One reporter per Highlight style, for the moving-UI test only. */
+const highlightStyles = [
+  'outline',
+  'clickDot',
+  'badge',
+  'spotlight',
+  'none',
+] as const;
+
 export default defineConfig({
   testDir: './tests',
   reporter: [
@@ -20,6 +29,17 @@ export default defineConfig({
       '@qa-instructions/playwright/reporter',
       { outputDir: 'qa-runs/ignore', testSteps: 'ignore', mask },
     ],
+    ...highlightStyles.map(
+      (highlight) =>
+        [
+          '@qa-instructions/playwright/reporter',
+          {
+            outputDir: `qa-runs/styles/${highlight}`,
+            highlight,
+            select: { files: ['moving-ui.spec.ts'] },
+          },
+        ] as const,
+    ),
   ],
   use: {
     baseURL,

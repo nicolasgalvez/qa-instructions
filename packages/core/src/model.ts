@@ -1,9 +1,17 @@
+/** The marks a Highlight can draw on a Step Screenshot. */
+export type HighlightMark = 'outline' | 'clickDot' | 'badge' | 'spotlight';
+
 export type QaAsset = {
   id: string;
   contentType: string;
   filename: string;
   sha256?: string;
+  /** The Highlight marks drawn on this Step Screenshot, if any. */
+  highlight?: HighlightMark[];
 };
+
+/** A width and height, in CSS pixels for a viewport or in pixels for an image. */
+export type QaSize = { width: number; height: number };
 
 /** A point on the page, in CSS pixels from the viewport's top-left corner. */
 export type QaPoint = { x: number; y: number };
@@ -37,6 +45,8 @@ export type QaStep = {
   elementBox?: QaBox;
   /** Where the Action clicked or tapped. */
   clickPoint?: QaPoint;
+  /** The viewport the Step Screenshot shows, in CSS pixels; scales its Highlight to the image. */
+  viewport?: QaSize;
 };
 
 export type QaRunBundle = {

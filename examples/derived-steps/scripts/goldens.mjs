@@ -72,6 +72,10 @@ export const GOLDENS = [
       bundleDir: `qa-runs/${name}`,
     })),
   ),
+  {
+    rendered: 'qa-steps-out/moving-ui--register-a-warranty-from-the-menu.txt',
+    golden: 'golden/moving-ui--register-a-warranty-from-the-menu.txt',
+  },
 ];
 
 const DATA_URI = /data:image\/png;base64,[A-Za-z0-9+/=]+/g;
@@ -100,8 +104,12 @@ export const OUTPUT_DIRS = ['qa-runs', 'qa-steps-out'];
 
 /**
  * Hand-written expectations for each bundle's Step Screenshots: one per QA
- * Step, taken at the expected moment, with pixel probes on known elements.
+ * Step, taken at the expected moment, with the Highlight marks it should
+ * carry and pixel probes on known elements and on the Highlight itself.
  */
 export const SCREENSHOT_GOLDENS = [
   'golden/sign-in--sign-in-with-bad-credentials.screenshots.json',
+  'golden/scripted-page--subscribe-to-the-newsletter.screenshots.json',
+  'golden/moving-ui--register-a-warranty-from-the-menu.screenshots.json',
+  'golden/moving-ui--highlight-styles.screenshots.json',
 ];

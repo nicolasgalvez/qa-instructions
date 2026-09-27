@@ -14,6 +14,18 @@ import {
 
 const TOLERANCE = 8;
 
+/**
+ * The documented Highlight geometry, in CSS pixels: the outline sits 2px
+ * clear of the element and is 3px thick; an approximate outline's dashes are
+ * 6px; the step-number badge (radius 11) is centered on the outline's corner.
+ * Written out here rather than imported, so the probes check the drawing
+ * independently of the code that plans it.
+ */
+const OUTLINE_GAP = 2;
+const OUTLINE_WIDTH = 3;
+const OUTLINE_DASH = 6;
+const BADGE_RADIUS = 11;
+
 let failed = false;
 
 function fail(message) {
@@ -21,43 +33,122 @@ function fail(message) {
   failed = true;
 }
 
-function probePoint(probe, step) {
-  if (probe.at !== 'elementBoxCenter') return { x: probe.x, y: probe.y };
-  const box = step.elementBox;
-  if (!box) return undefined;
+/** The top-left corner of the outline's outer edge, in image pixels. */
+function outlineCorner(box, scale) {
+  const grow = OUTLINE_GAP + OUTLINE_WIDTH;
   return {
-    x: Math.round(box.x + box.width / 2),
-    y: Math.round(box.y + box.height / 2),
+    x: Math.max(0, Math.floor((box.x - grow) * scale)),
+    y: Math.max(0, Math.floor((box.y - grow) * scale)),
   };
 }
 
+/**
+ * Where a probe samples, in image pixels. Absolute probes are in viewport
+ * CSS pixels; the rest are relative to the step's element box or click point.
+ */
+function probePoint(probe, step, scale) {
+  const box = step.elementBox;
+  const at = (x, y) => ({ x: Math.floor(x * scale), y: Math.floor(y * scale) });
+  switch (probe.at) {
+    case undefined:
+      return at(probe.x, probe.y);
+    case 'clickPoint':
+      return step.clickPoint && at(step.clickPoint.x, step.clickPoint.y);
+  }
+  if (!box) return undefined;
+  const middleY = box.y + box.height / 2;
+  switch (probe.at) {
+    case 'elementBoxCenter':
+      return at(box.x + box.width / 2, middleY);
+    // Inside the element, `dx` from its left edge (from its right if negative).
+    case 'inside':
+      return at(
+        probe.dx >= 0 ? box.x + probe.dx : box.x + box.width + probe.dx,
+        middleY,
+      );
+    // Halfway through the outline's left edge.
+    case 'outline':
+      return at(box.x - OUTLINE_GAP - OUTLINE_WIDTH / 2, middleY);
+    // In the first dash of the outline's top edge, then in the gap after it.
+    case 'outlineDash':
+    case 'outlineDashGap': {
+      const corner = outlineCorner(box, scale);
+      const along = probe.at === 'outlineDash' ? 2 : OUTLINE_DASH + 4;
+      return {
+        x: corner.x + Math.floor(along * scale),
+        y: corner.y + Math.floor(scale),
+      };
+    }
+    // Near the top of the badge circle, clear of its number.
+    case 'badge': {
+      const corner = outlineCorner(box, scale);
+      const radius = BADGE_RADIUS * scale;
+      return {
+        x: Math.max(corner.x, radius),
+        y: Math.floor(Math.max(corner.y, radius) - radius + 3 * scale),
+      };
+    }
+    default:
+      throw new Error(`unknown probe position "${probe.at}"`);
+  }
+}
+
 async function verifyScreenshots(goldenFile) {
-  const golden = JSON.parse(
+  const parsed = JSON.parse(
     await readFile(path.join(root, goldenFile), 'utf8'),
   );
-  const bundleDir = path.join(root, 'qa-runs', golden.bundleDir);
+  for (const golden of [parsed].flat()) {
+    for (const bundleDir of golden.bundleDirs) {
+      await verifyBundleScreenshots(golden, bundleDir);
+    }
+  }
+}
+
+async function verifyBundleScreenshots(golden, bundleDirName) {
+  const bundleDir = path.join(root, 'qa-runs', bundleDirName);
   const bundle = JSON.parse(
     await readFile(path.join(bundleDir, 'bundle.json'), 'utf8'),
   );
 
-  if (bundle.steps.length !== golden.steps.length) {
+  if (golden.highlights) {
+    const actual = bundle.steps.map(
+      (step) => bundle.assets[step.assetIds?.[0]]?.highlight ?? null,
+    );
+    if (JSON.stringify(actual) !== JSON.stringify(golden.highlights)) {
+      fail(
+        `${bundleDirName}: Highlights ${JSON.stringify(actual)}, expected ${JSON.stringify(golden.highlights)}`,
+      );
+    }
+  }
+
+  // Steps listed by `index` are spot checks; otherwise every step is listed.
+  const spotChecks = golden.steps.every((s) => s.index !== undefined);
+  if (!spotChecks && bundle.steps.length !== golden.steps.length) {
     fail(
-      `${golden.bundleDir}: ${bundle.steps.length} QA Steps, expected ${golden.steps.length}`,
+      `${bundleDirName}: ${bundle.steps.length} QA Steps, expected ${golden.steps.length}`,
     );
     return;
   }
 
   for (const [i, expected] of golden.steps.entries()) {
-    const step = bundle.steps[i];
-    const label = `${golden.bundleDir} step ${i + 1}`;
-    if (step.action !== expected.action) {
+    const index = expected.index ?? i + 1;
+    const step = bundle.steps[index - 1];
+    const label = `${bundleDirName} step ${index}`;
+    if (!step) {
+      fail(`${label}: missing`);
+      continue;
+    }
+    if (expected.action !== undefined && step.action !== expected.action) {
       fail(`${label}: action "${step.action}", expected "${expected.action}"`);
     }
     if (step.assetIds?.length !== 1) {
       fail(`${label}: expected one Step Screenshot, got ${step.assetIds}`);
       continue;
     }
-    if (step.screenshotMoment !== expected.moment) {
+    if (
+      expected.moment !== undefined &&
+      step.screenshotMoment !== expected.moment
+    ) {
       fail(
         `${label}: screenshot taken ${step.screenshotMoment}, expected ${expected.moment}`,
       );
@@ -75,18 +166,22 @@ async function verifyScreenshots(goldenFile) {
       fail(`${label}: screenshot is only ${data.length} bytes`);
     }
 
+    // A high-DPI screenshot may be a whole multiple of the viewport.
     const png = PNG.sync.read(data);
+    const scale = png.width / golden.viewport.width;
     if (
-      png.width !== golden.viewport.width ||
-      png.height !== golden.viewport.height
+      !Number.isInteger(scale) ||
+      png.height !== golden.viewport.height * scale
     ) {
       fail(`${label}: screenshot is ${png.width}x${png.height}`);
     }
 
     for (const probe of expected.probes) {
-      const point = probePoint(probe, step);
+      const point = probePoint(probe, step, scale);
       if (!point) {
-        fail(`${label}: no element box for probe "${probe.name}"`);
+        fail(
+          `${label}: no element box or click point for probe "${probe.name}"`,
+        );
         continue;
       }
       const idx = (png.width * point.y + point.x) * 4;
