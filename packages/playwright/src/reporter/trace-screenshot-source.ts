@@ -7,12 +7,14 @@ import type {
   QaSize,
   RecordedElement,
   ScreenshotSource,
+  SectionChanges,
 } from '@qa-instructions/core';
 
 import { ActionRef } from './action-ref.js';
 import { PageStates } from './page-states.js';
 import { RecordingFrames, type RecordedCall } from './recording-frames.js';
 import { Screencast } from './screencast.js';
+import { SectionChangeReader, type DocumentPair } from './section-changes.js';
 import { SelectorParser } from './selector-parser.js';
 import { FrameSnapshots } from './snapshot-dom.js';
 import { SnapshotTarget } from './snapshot-target.js';
@@ -123,7 +125,10 @@ class TraceCalls {
   private readonly snapshotTimes = new Map<string, number>();
   /** Each frame's DOM snapshots, by frame id. */
   private readonly frames = new Map<string, FrameSnapshots>();
+  /** Each DOM snapshot's index in its frame's snapshots, by name and frame id. */
+  private readonly snapshotIndexes = new Map<string, Map<string, number>>();
   private readonly selectors = new SelectorParser();
+  private readonly sectionReader = new SectionChangeReader();
   private viewport?: QaSize;
   /** The context's wall-clock time minus its trace-clock time. */
   private wallClockOffset?: number;
@@ -167,6 +172,35 @@ class TraceCalls {
       record.callId,
       record.method === UNTRACED_SCRIPT_LOOKUP,
     );
+  }
+
+  /**
+   * The sections a call that changed the page opened or closed, read from
+   * the same DOM snapshots `pageChanged` compares, when that is all it
+   * changed.
+   */
+  sectionChanges(record: CallRecord): SectionChanges | undefined {
+    if (record.callId === undefined || !this.pageChanged(record)) {
+      return undefined;
+    }
+    const around = this.pages.snapshotsAround(
+      record.callId,
+      record.method === UNTRACED_SCRIPT_LOOKUP,
+    );
+    const before = around && this.snapshotIndexes.get(around.before);
+    const after = around && this.snapshotIndexes.get(around.after);
+    if (!before || !after || before.size !== after.size) return undefined;
+    const pairs: DocumentPair[] = [];
+    for (const [frameId, index] of after) {
+      const was = before.get(frameId);
+      const frame = this.frames.get(frameId);
+      if (was === undefined || !frame) return undefined;
+      pairs.push({
+        before: frame.document(was).document,
+        after: frame.document(index).document,
+      });
+    }
+    return this.sectionReader.between(pairs);
   }
 
   /**
@@ -299,10 +333,12 @@ class TraceCalls {
   private addSnapshot(snapshot: unknown): void {
     if (!this.isRecord(snapshot)) return;
     // Every snapshot of a frame is kept: later ones refer back to them.
-    const frame = this.frame(snapshot.frameId);
+    const frameKey = this.frameKey(snapshot.frameId);
+    const frame = this.frame(frameKey);
     const index = frame.add(snapshot.html);
     if (typeof snapshot.callId !== 'string') return;
     this.pages.add(snapshot);
+    this.indexSnapshot(snapshot, frameKey, index);
 
     const { snapshotName, timestamp } = snapshot;
     if (
@@ -321,8 +357,27 @@ class TraceCalls {
     }
   }
 
-  private frame(frameId: unknown): FrameSnapshots {
-    const key = typeof frameId === 'string' ? frameId : '';
+  /** Remembers where a named snapshot sits among its frame's snapshots. */
+  private indexSnapshot(
+    snapshot: Record<string, unknown>,
+    frameKey: string,
+    index: number,
+  ): void {
+    const name = PageStates.nameOf(snapshot);
+    if (name === undefined) return;
+    let byFrame = this.snapshotIndexes.get(name);
+    if (!byFrame) {
+      byFrame = new Map();
+      this.snapshotIndexes.set(name, byFrame);
+    }
+    byFrame.set(frameKey, index);
+  }
+
+  private frameKey(frameId: unknown): string {
+    return typeof frameId === 'string' ? frameId : '';
+  }
+
+  private frame(key: string): FrameSnapshots {
     let frame = this.frames.get(key);
     if (!frame) {
       frame = new FrameSnapshots();
@@ -468,6 +523,7 @@ export class TraceScreenshotSource implements ScreenshotSource {
         element: record.element,
         viewport: record.viewport,
         pageChanged: calls.pageChanged(record),
+        sectionChanges: calls.sectionChanges(record),
         forced: record.forced,
       });
     }

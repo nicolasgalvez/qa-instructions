@@ -193,14 +193,36 @@ export class PageStates {
    * Playwright marked as a call's target. Undefined without both snapshots.
    */
   changedBy(callId: string, untilNext = false): boolean | undefined {
+    const around = this.around(callId, untilNext);
+    return (
+      around &&
+      this.pageState(around.before).dom !== this.pageState(around.after).dom
+    );
+  }
+
+  /**
+   * The names of the snapshots `changedBy` compares for a call: the page
+   * before it and after it (or, with `untilNext`, at the page's next
+   * snapshot). Undefined without both.
+   */
+  snapshotsAround(
+    callId: string,
+    untilNext = false,
+  ): { before: string; after: string } | undefined {
+    const around = this.around(callId, untilNext);
+    return around && { before: around.before.name, after: around.after.name };
+  }
+
+  private around(
+    callId: string,
+    untilNext: boolean,
+  ): { before: Moment; after: Moment } | undefined {
     for (const moments of this.moments.values()) {
       const before = moments.find((m) => m.name === `before@${callId}`);
       const at = moments.findIndex((m) => m.name === `after@${callId}`);
       const after = moments[untilNext ? at + 1 : at];
       if (before && at >= 0) {
-        return after === undefined
-          ? undefined
-          : this.pageState(before).dom !== this.pageState(after).dom;
+        return after === undefined ? undefined : { before, after };
       }
     }
     return undefined;
@@ -210,7 +232,7 @@ export class PageStates {
    * A snapshot's name, e.g. `before@call@12`. Playwright 1.53–1.62 write it
    * as `snapshotName`; 1.63 writes the call and its `phase` instead.
    */
-  private static nameOf(snapshot: Record<string, unknown>): string | undefined {
+  static nameOf(snapshot: Record<string, unknown>): string | undefined {
     const { snapshotName, phase, callId } = snapshot;
     if (typeof snapshotName === 'string') return snapshotName;
     return typeof phase === 'string' && typeof callId === 'string'
