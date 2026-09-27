@@ -4,6 +4,7 @@ import type {
   ActionKind,
   CheckEvent,
   TestEvent,
+  TestStartEvent,
 } from '@qa-instructions/core';
 
 import { LocatorParser } from './locator-parser.js';
@@ -74,21 +75,26 @@ export class PlaywrightStepTranslator {
   constructor(private readonly locators = new LocatorParser()) {}
 
   translate(test: TestCase, result: TestResult): TestEvent[] {
-    const project = test.parent.project();
-    const baseURL = project?.use?.baseURL;
-
     return [
-      {
-        type: 'testStart',
-        title: test.title,
-        runner: 'playwright',
-        file: test.location.file,
-        project: project?.name || undefined,
-        baseUrl: typeof baseURL === 'string' ? baseURL : undefined,
-      },
+      this.testStart(test),
       ...this.translateSteps(result.steps),
       { type: 'testEnd', status: result.status },
     ];
+  }
+
+  testStart(test: TestCase): TestStartEvent {
+    const project = test.parent.project();
+    const baseURL = project?.use?.baseURL;
+
+    return {
+      type: 'testStart',
+      title: test.title,
+      runner: 'playwright',
+      file: test.location.file,
+      tags: [...test.tags],
+      project: project?.name || undefined,
+      baseUrl: typeof baseURL === 'string' ? baseURL : undefined,
+    };
   }
 
   private translateSteps(steps: TestStep[]): TestEvent[] {

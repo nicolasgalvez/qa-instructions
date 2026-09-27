@@ -15,5 +15,8 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "minimatch": "^10.2.6"
+  }
 }

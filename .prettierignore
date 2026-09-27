@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-test/
 qa-runs/
+qa-runs-selection/
 qa-steps-out/
 playwright-report/
 test-results/

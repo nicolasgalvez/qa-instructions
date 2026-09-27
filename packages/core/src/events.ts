@@ -51,6 +51,8 @@ export type TestStartEvent = {
   title: string;
   runner: 'playwright' | 'jest';
   file?: string;
+  /** Tags the runner reports for the test, as written (e.g. `@smoke`). */
+  tags?: string[];
   project?: string;
   /** Base URL that relative navigation URLs resolve against. */
   baseUrl?: string;

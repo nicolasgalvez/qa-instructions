@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -24,9 +24,10 @@ function step(spec: StepSpec): TestStep {
   } as unknown as TestStep;
 }
 
-function mockTestCase(): TestCase {
+function mockTestCase(tags: string[] = []): TestCase {
   return {
     title: 'Sign in with bad credentials',
+    tags,
     location: { file: '/proj/tests/sign-in.spec.ts', line: 1, column: 1 },
     parent: {
       project: () => ({
@@ -193,6 +194,46 @@ test('reporter derives QA Steps from an unmodified test run', async () => {
         url: undefined,
       },
     ],
+  );
+});
+
+async function bundleDirsAfterRun(
+  options: ConstructorParameters<typeof QaInstructionsReporter>[0],
+  tags: string[],
+): Promise<string[]> {
+  const out = await mkdtemp(path.join(tmpdir(), 'qa-reporter-'));
+  try {
+    const reporter = new QaInstructionsReporter({ ...options, outputDir: out });
+    await reporter.onTestEnd(mockTestCase(tags), {
+      status: 'passed',
+      retry: 0,
+      attachments: [],
+      steps: [
+        step({ category: 'pw:api', title: 'Navigate', params: { url: '/' } }),
+      ],
+    } as unknown as TestResult);
+    return await readdir(out);
+  } finally {
+    await rm(out, { recursive: true, force: true });
+  }
+}
+
+test('reporter selects tests by the tags Playwright reports', async () => {
+  const select = { tags: ['@qa'] };
+  assert.deepEqual(await bundleDirsAfterRun({ select }, ['@qa']), [
+    'sign-in--sign-in-with-bad-credentials',
+  ]);
+  assert.deepEqual(await bundleDirsAfterRun({ select }, ['@slow']), []);
+});
+
+test('reporter selects tests by the test file Playwright reports', async () => {
+  assert.deepEqual(
+    await bundleDirsAfterRun({ select: { files: ['tests/sign-in.*'] } }, []),
+    ['sign-in--sign-in-with-bad-credentials'],
+  );
+  assert.deepEqual(
+    await bundleDirsAfterRun({ select: { files: ['**/cart/**'] } }, []),
+    [],
   );
 });
 
