@@ -1,66 +1,79 @@
-import type { QaRunBundle, QaStep } from '../model.js';
+import type { QaRunBundle } from '../model.js';
+import { HtmlRenderer } from './html.js';
+import type { StepImages } from './images.js';
+import { MarkdownRenderer } from './markdown.js';
+import { TextRenderer } from './text.js';
+import { QaInstructionsView } from './view.js';
 
-/** Where an incomplete test stopped, for the note above its QA Steps. */
-function incompleteNote(bundle: QaRunBundle): string {
-  const failing = bundle.steps.find((step) => step.failed);
-  const last = bundle.steps.at(-1);
-  if (failing) {
-    return `**Incomplete:** the test failed at step ${failing.index}, so any later steps are missing.`;
-  }
-  if (last) {
-    return `**Incomplete:** the test failed after step ${last.index}, so any later steps are missing.`;
-  }
-  return '**Incomplete:** the test failed before its first step.';
-}
+export {
+  EmbeddedImages,
+  RelativeImageLinks,
+  type StepImages,
+} from './images.js';
+export { InlineMarkup } from './inline-markup.js';
+export {
+  QaInstructionsView,
+  QaWording,
+  type QaStepView,
+  type SectionRun,
+  type StepScreenshotView,
+} from './view.js';
+export { HtmlRenderer, MarkdownRenderer, TextRenderer };
 
+export type RenderOptions = {
+  /** Where Markdown and HTML find Step Screenshots; omitted, none are shown. */
+  images?: StepImages;
+};
+
+/** Jira-ready plain text. */
 export function renderQaSteps(bundle: QaRunBundle): string {
-  const lines: string[] = [];
-
-  if (bundle.meta.status === 'incomplete') {
-    lines.push(incompleteNote(bundle), '');
-  }
-
-  if (bundle.meta.prerequisite) {
-    lines.push(bundle.meta.prerequisite, '');
-  }
-
-  let section = '';
-  for (const step of bundle.steps) {
-    const title = sectionTitle(step);
-    if (title !== section) {
-      if (lines.length > 0 && lines.at(-1) !== '') lines.push('');
-      if (title) lines.push(`### ${title}`);
-      section = title;
-    }
-    const warning = step.warning ? 'Warning: ' : '';
-    const approximate = step.approximate
-      ? ' (approximate: the test forced this Action past its usual checks, so its highlight may not line up)'
-      : '';
-    const expected = step.expected ? ` — ${step.expected}` : '';
-    const failed = step.failed ? ' (**test failed here**)' : '';
-    lines.push(
-      `${step.index}. ${warning}${step.action}${approximate}${expected}${failed}`,
-    );
-  }
-
-  return lines.join('\n').trimEnd() + '\n';
+  return new TextRenderer().render(QaInstructionsView.from(bundle));
 }
 
-/** A step's Section as one heading; nested groups read outermost first. */
-function sectionTitle(step: QaStep): string {
-  return (step.section ?? []).join(' › ');
+/** PR-ready Markdown with each Step Screenshot inline. */
+export function renderMarkdown(
+  bundle: QaRunBundle,
+  options: RenderOptions = {},
+): string {
+  return new MarkdownRenderer(options.images).render(
+    QaInstructionsView.from(bundle),
+  );
+}
+
+/** A standalone HTML page. */
+export function renderHtml(
+  bundle: QaRunBundle,
+  options: RenderOptions = {},
+): string {
+  return new HtmlRenderer(options.images).render(
+    QaInstructionsView.from(bundle),
+  );
 }
 
 export function renderJson(bundle: QaRunBundle): string {
   return JSON.stringify(bundle, null, 2) + '\n';
 }
 
-export type RenderFormat = 'qa-steps' | 'json';
+export const RENDER_FORMATS = ['qa-steps', 'markdown', 'html', 'json'] as const;
 
-export function render(bundle: QaRunBundle, format: RenderFormat): string {
+export type RenderFormat = (typeof RENDER_FORMATS)[number];
+
+export function isRenderFormat(value: string): value is RenderFormat {
+  return (RENDER_FORMATS as readonly string[]).includes(value);
+}
+
+export function render(
+  bundle: QaRunBundle,
+  format: RenderFormat,
+  options: RenderOptions = {},
+): string {
   switch (format) {
     case 'qa-steps':
       return renderQaSteps(bundle);
+    case 'markdown':
+      return renderMarkdown(bundle, options);
+    case 'html':
+      return renderHtml(bundle, options);
     case 'json':
       return renderJson(bundle);
     default: {

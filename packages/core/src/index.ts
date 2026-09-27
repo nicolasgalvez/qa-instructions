@@ -26,10 +26,32 @@ export {
 } from './instructions/run.js';
 export { BundleDirNamer, type BundleIdentity } from './bundle/dir-namer.js';
 export { createBundleBuilder, type BundleBuilder } from './bundle/builder.js';
-export { writeBundle, readBundle, bundleDirName } from './bundle/io.js';
+export {
+  writeBundle,
+  readBundle,
+  readBundleAssets,
+  bundleDirName,
+} from './bundle/io.js';
 export {
   render,
   renderQaSteps,
+  renderMarkdown,
+  renderHtml,
   renderJson,
+  isRenderFormat,
+  RENDER_FORMATS,
+  EmbeddedImages,
+  RelativeImageLinks,
+  HtmlRenderer,
+  MarkdownRenderer,
+  TextRenderer,
+  QaInstructionsView,
+  QaWording,
+  InlineMarkup,
   type RenderFormat,
+  type RenderOptions,
+  type StepImages,
+  type QaStepView,
+  type SectionRun,
+  type StepScreenshotView,
 } from './render/index.js';
