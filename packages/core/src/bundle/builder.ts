@@ -38,6 +38,7 @@ export function createBundleBuilder(): BundleBuilder {
         expected: input.expected,
         url: input.url,
         assetIds: input.assetIds,
+        section: input.section,
       };
       steps.push(step);
       return step;

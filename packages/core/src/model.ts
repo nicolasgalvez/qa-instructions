@@ -11,6 +11,8 @@ export type QaStep = {
   expected?: string;
   url?: string;
   assetIds?: string[];
+  /** Titles of the Section this step is in, outermost group first. */
+  section?: string[];
 };
 
 export type QaRunBundle = {
@@ -41,6 +43,7 @@ export type QaStepInput = {
   expected?: string;
   url?: string;
   assetIds?: string[];
+  section?: string[];
 };
 
 export type QaAssetInput = {

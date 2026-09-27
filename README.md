@@ -35,6 +35,12 @@ Each test's browser Actions (opening a URL, clicking, typing, pressing keys, cho
 5. Press **Tab**
 ```
 
+When a test groups its actions with `test.step`, each group's title becomes a Section heading over its QA Steps, with numbering continuous across Sections and nested groups read as `Outer › Inner`. Set the reporter's `testSteps` option to `'collapse'` to turn each group into one QA Step named after it, or to `'ignore'` to list the steps flat:
+
+```typescript
+['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs', testSteps: 'collapse' }],
+```
+
 ## Render
 
 Rendering is a separate step, so you can re-render without re-running tests:

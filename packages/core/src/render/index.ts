@@ -1,4 +1,4 @@
-import type { QaRunBundle } from '../model.js';
+import type { QaRunBundle, QaStep } from '../model.js';
 
 export function renderQaSteps(bundle: QaRunBundle): string {
   const lines: string[] = [];
@@ -7,12 +7,24 @@ export function renderQaSteps(bundle: QaRunBundle): string {
     lines.push(bundle.meta.prerequisite, '');
   }
 
+  let section = '';
   for (const step of bundle.steps) {
+    const title = sectionTitle(step);
+    if (title !== section) {
+      if (lines.length > 0 && lines.at(-1) !== '') lines.push('');
+      if (title) lines.push(`### ${title}`);
+      section = title;
+    }
     const expected = step.expected ? ` — ${step.expected}` : '';
     lines.push(`${step.index}. ${step.action}${expected}`);
   }
 
   return lines.join('\n').trimEnd() + '\n';
+}
+
+/** A step's Section as one heading; nested groups read outermost first. */
+function sectionTitle(step: QaStep): string {
+  return (step.section ?? []).join(' › ');
 }
 
 export function renderJson(bundle: QaRunBundle): string {

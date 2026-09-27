@@ -85,8 +85,25 @@ export type TestEndEvent = {
   status: 'passed' | 'failed' | 'timedOut' | 'skipped' | 'interrupted';
 };
 
+/** The test opened a named group of its own (e.g. Playwright `test.step`). Groups nest. */
+export type GroupStartEvent = {
+  type: 'groupStart';
+  title: string;
+};
+
+/** The innermost open group closed. */
+export type GroupEndEvent = {
+  type: 'groupEnd';
+  title: string;
+};
+
 export type TestEvent =
-  TestStartEvent | ActionEvent | CheckEvent | TestEndEvent;
+  | TestStartEvent
+  | ActionEvent
+  | CheckEvent
+  | GroupStartEvent
+  | GroupEndEvent
+  | TestEndEvent;
 
 /** Anything that consumes the neutral test event stream. */
 export interface TestEventSink {
