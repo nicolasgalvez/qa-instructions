@@ -56,14 +56,22 @@ export const GOLDENS = [
     rendered: 'qa-steps-out/scripted-page--read-the-faq.txt',
     golden: 'golden/scripted-page--read-the-faq.txt',
   },
+  // The FAQ's script, on a page it changes nothing on: no warning.
+  {
+    rendered:
+      'qa-steps-out/scripted-page--open-collapsed-sections-on-a-page-without-any.txt',
+    golden:
+      'golden/scripted-page--open-collapsed-sections-on-a-page-without-any.txt',
+  },
   {
     rendered: 'qa-steps-out/scripted-page--subscribe-to-the-newsletter.txt',
     golden: 'golden/scripted-page--subscribe-to-the-newsletter.txt',
   },
-  // Markdown and HTML for bundles covering screenshots, a warning step,
+  // Markdown and HTML for bundles covering screenshots, warning steps,
   // nested Sections, an approximate step, and an incomplete (failed) test.
   ...[
     'sign-in--sign-in-with-bad-credentials',
+    'scripted-page--read-the-faq',
     'grouped--sign-in-with-good-credentials',
     'scripted-page--subscribe-to-the-newsletter',
     'failing/failing--sign-in-shows-the-wrong-user',

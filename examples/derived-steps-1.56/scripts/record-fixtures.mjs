@@ -12,6 +12,7 @@ import { SPECS, derivedSteps, root, syncSpecs } from './shared.mjs';
 //   traces/v8-checks.zip                  the cart test's 1.56 trace, whose
 //                                         checks the steps do not describe
 //   traces/v8-scroll.zip                  the scroll scenario's 1.56 trace
+//   traces/v8-scripts.zip                 the scripts scenario's 1.56 trace
 
 const fixtures = path.join(
   root,
@@ -23,11 +24,12 @@ const fixtures = path.join(
   'fixtures',
 );
 /** The adapter's own trace scenarios, recorded by the `trace` project. */
-const SCENARIOS = ['scenario.spec.ts', 'scroll.spec.ts'];
+const SCENARIOS = ['scenario.spec.ts', 'scroll.spec.ts', 'scripts.spec.ts'];
 /** Each recorded test's results directory prefix and the sample trace it becomes. */
 const TRACES = [
   ['scenario-', 'v8.zip'],
   ['scroll-', 'v8-scroll.zip'],
+  ['scripts-', 'v8-scripts.zip'],
   ['cart-', 'v8-checks.zip'],
 ];
 
