@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   QaInstructionsRecorder,
   renderQaSteps,
+  type ElementTarget,
   type QaRunBundle,
   type TestEvent,
 } from '../src/index.js';
@@ -370,6 +371,115 @@ test('checks a tester cannot see are not Expected Results', () => {
       { type: 'check', matcher: 'toHaveURL', negated: false, subject: 'page' },
     ),
     [{ action: 'Reload the page' }],
+  );
+});
+
+test("a value check with the author's message names the message and the expected value", () => {
+  assert.deepEqual(
+    qaSteps(
+      { type: 'action', kind: 'navigate', url: '/cart' },
+      {
+        type: 'check',
+        matcher: 'toBe',
+        negated: false,
+        subject: 'value',
+        expected: '3',
+        description: 'cart line-item quantity',
+      },
+      {
+        type: 'check',
+        matcher: 'toBeCloseTo',
+        negated: false,
+        subject: 'value',
+        expected: '15',
+        description: 'cart subtotal (qty × unit price)',
+      },
+      {
+        type: 'check',
+        matcher: 'toBeGreaterThan',
+        negated: false,
+        subject: 'value',
+        expected: '0',
+        description: 'items in stock',
+      },
+      {
+        type: 'check',
+        matcher: 'toEqual',
+        negated: true,
+        subject: 'value',
+        expected: 'Pending',
+        description: 'order status',
+      },
+    ),
+    [
+      {
+        action: 'Open http://127.0.0.1:4321/cart',
+        expected:
+          '**cart line-item quantity** is **3**; **cart subtotal (qty × unit price)** is **15**; **items in stock** is more than **0**; **order status** is not **Pending**',
+      },
+    ],
+  );
+});
+
+test('a value check says nothing a tester can use without a message or an expected value', () => {
+  assert.deepEqual(
+    qaSteps(
+      { type: 'action', kind: 'reload' },
+      {
+        type: 'check',
+        matcher: 'toBe',
+        negated: false,
+        subject: 'value',
+        expected: '3',
+      },
+      {
+        type: 'check',
+        matcher: 'toBe',
+        negated: false,
+        subject: 'value',
+        description: 'cart line-item quantity',
+      },
+      {
+        type: 'check',
+        matcher: 'toMatchObject',
+        negated: false,
+        subject: 'value',
+        expected: 'x',
+        description: 'cart',
+      },
+    ),
+    [{ action: 'Reload the page' }],
+  );
+});
+
+test('an element check with a message names the element by the message only when it has no readable name', () => {
+  const visible = (
+    target: ElementTarget | undefined,
+    description?: string,
+  ): TestEvent => ({
+    type: 'check',
+    matcher: 'toBeVisible',
+    negated: false,
+    subject: 'element',
+    target,
+    description,
+  });
+  assert.deepEqual(
+    qaSteps(
+      { type: 'action', kind: 'reload' },
+      visible({ by: 'selector', value: '#purchase_1174' }, 'purchase form'),
+      visible(undefined, 'quantity field'),
+      visible({ by: 'role', role: 'button' }, 'buy button'),
+      visible({ by: 'text', value: 'Added to cart' }, 'added message'),
+      visible({ by: 'selector', value: '#total' }),
+    ),
+    [
+      {
+        action: 'Reload the page',
+        expected:
+          '**purchase form** is visible; **quantity field** is visible; **buy button** is visible; **Added to cart** is visible; the **#total** element is visible',
+      },
+    ],
   );
 });
 

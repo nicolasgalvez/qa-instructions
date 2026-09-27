@@ -17,6 +17,7 @@ export const SPECS = [
   'scripted-page.spec.ts',
   'login.spec.ts',
   'moving-ui.spec.ts',
+  'cart.spec.ts',
 ];
 
 /** Each test's bundle and the derived-steps (Playwright 1.63) golden it must match. */
@@ -27,6 +28,7 @@ export const GOLDENS = [
   'scripted-page--subscribe-to-the-newsletter',
   'login--sign-in-with-a-password',
   'moving-ui--register-a-warranty-from-the-menu',
+  'cart--add-credits-to-the-cart',
 ];
 
 /**

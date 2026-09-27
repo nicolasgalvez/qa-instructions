@@ -162,11 +162,13 @@ Requires `@playwright/test` 1.53 or later.
 | 1.63+      | Step data (`subtitle`, `params`)                 | One full-size screenshot per Action, element box and click point | `use: { trace: { mode: 'on', snapshots: { screen: true, dom: true } } }` |
 | 1.53–1.62  | Step titles, plus each check's line in your test | A frame of the screen recording per Action; click point          | `use: { trace: 'on' }`                                                   |
 
-On 1.53–1.62 the QA Steps and Expected Results read the same as on 1.63; screenshots are rougher (recorded JPEG frames, and no element box, so no outline). A click gets the frame drawn at the moment it was made, with its click point marked, when the recording has one from no more than 50ms before; any other Action, or a click without such a frame, gets the frame from when it ended, unmarked. Two limits there: a check whose subject is a variable (`expect(button).toBeVisible()`) has no element to name, and a navigation to an absolute URL held in a variable keeps only its path. Traces in formats other than 8, 9, and 10 give text-only QA Instructions and a warning.
+On 1.53–1.62 the QA Steps and Expected Results read the same as on 1.63; screenshots are rougher (recorded JPEG frames, and no element box, so no outline). A click gets the frame drawn at the moment it was made, with its click point marked, when the recording has one from no more than 50ms before; any other Action, or a click without such a frame, gets the frame from when it ended, unmarked. Two limits there: a check whose subject is a variable (`expect(button).toBeVisible()`) has no element to name unless the check has a message, and a navigation to an absolute URL held in a variable keeps only its path. Traces in formats other than 8, 9, and 10 give text-only QA Instructions and a warning.
 
 ## What you get
 
 Each test's browser Actions (opening a URL, clicking, typing, pressing keys, choosing options) become numbered QA Steps, and the `expect` checks that follow an Action become its Expected Result. Waits, scripts, value reads, and API requests are left out because a tester cannot repeat them. A test's `test.step` groups become Sections (see [`testSteps`](#teststeps)).
+
+A check's message names what it checks. `expect(cartQty, 'cart line-item quantity').toBe(3)` reads "**cart line-item quantity** is **3**", so a value the test read from the page still tells the tester what to look for; a value checked without a message is left out. On an element, the message is used only when the element has no readable name (a CSS selector, or a role without a name): `expect(form, 'purchase form').toBeVisible()` on `locator('#purchase_1174')` reads "**purchase form** is visible".
 
 ```
 1. Open http://127.0.0.1:4321/ — The **Fixture App** heading is visible

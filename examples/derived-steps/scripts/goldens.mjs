@@ -76,6 +76,11 @@ export const GOLDENS = [
     rendered: 'qa-steps-out/moving-ui--register-a-warranty-from-the-menu.txt',
     golden: 'golden/moving-ui--register-a-warranty-from-the-menu.txt',
   },
+  // Checks with the author's messages, on values read into variables.
+  {
+    rendered: 'qa-steps-out/cart--add-credits-to-the-cart.txt',
+    golden: 'golden/cart--add-credits-to-the-cart.txt',
+  },
 ];
 
 const DATA_URI = /data:image\/png;base64,[A-Za-z0-9+/=]+/g;

@@ -15,6 +15,10 @@ export type CallSite = {
 
 /** What the test's own source says about one `expect(subject).matcher(expected)` check. */
 export type CheckSite = {
+  /** The matcher as written, e.g. `toBeVisible`. */
+  matcher: string;
+  /** The check is written with `.not`. */
+  negated: boolean;
   /** The checked subject as written, e.g. `page.getByLabel('Username')` or `page`. */
   subject: string;
   /** The matcher's first argument, when it is written as a plain literal. */
@@ -160,13 +164,17 @@ export class CallSiteReader {
     const offset = source?.offsetOf(location.line, location.column);
     if (!source || offset === undefined) return undefined;
     const { text } = source;
+    const matcher = this.wordAt(text, offset);
+    if (!matcher) return undefined;
 
+    let negated = false;
     let i = this.skipSpaceBack(text, offset);
     for (;;) {
       if (text[i - 1] !== '.') return undefined;
       i = this.skipSpaceBack(text, i - 1);
       const word = this.wordBefore(text, i);
       if (!MATCHER_PREFIXES.has(word)) break;
+      if (word === 'not') negated = !negated;
       i = this.skipSpaceBack(text, i - word.length);
     }
     if (text[i - 1] !== ')') return undefined;
@@ -180,7 +188,8 @@ export class CallSiteReader {
     const expected =
       matcherArgs &&
       this.valueOf(source, this.firstArgument(source, matcherArgs));
-    return expected === undefined ? { subject } : { subject, expected };
+    const site = { matcher, negated, subject };
+    return expected === undefined ? site : { ...site, expected };
   }
 
   /** `expect`, `expect.soft`, or `expect.poll` ends just before `end`. */
@@ -352,6 +361,12 @@ export class CallSiteReader {
     let i = end;
     while (i > 0 && /\s/.test(text[i - 1])) i -= 1;
     return i;
+  }
+
+  private wordAt(text: string, start: number): string {
+    let i = start;
+    while (i < text.length && this.isIdentifierChar(text[i])) i += 1;
+    return text.slice(start, i);
   }
 
   private wordBefore(text: string, end: number): string {

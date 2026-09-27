@@ -1,0 +1,164 @@
+{
+  "title": "Add credits to the cart",
+  "steps": [
+    {
+      "title": "Before Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"browser\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Launch browser",
+              "category": "pw:api"
+            }
+          ]
+        },
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create context",
+              "category": "pw:api"
+            }
+          ]
+        },
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create page",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Navigate",
+      "category": "pw:api",
+      "subtitle": "/shop",
+      "params": {
+        "url": "/shop"
+      },
+      "location": {
+        "file": "cart.spec.ts",
+        "line": 10,
+        "column": 14
+      }
+    },
+    {
+      "title": "purchase form for 1174",
+      "category": "expect",
+      "subtitle": "locator('#purchase_1174')",
+      "params": {
+        "locator": "locator('#purchase_1174')"
+      },
+      "location": {
+        "file": "cart.spec.ts",
+        "line": 14,
+        "column": 56
+      }
+    },
+    {
+      "title": "Fill \"3\"",
+      "category": "pw:api",
+      "subtitle": "locator('#purchase_1174').locator('input[name=\"download_quantity\"]')",
+      "params": {
+        "locator": "locator('#purchase_1174').locator('input[name=\"download_quantity\"]')",
+        "value": "3"
+      },
+      "location": {
+        "file": "cart.spec.ts",
+        "line": 17,
+        "column": 18
+      }
+    },
+    {
+      "title": "Click",
+      "category": "pw:api",
+      "subtitle": "locator('#purchase_1174').getByRole('button', { name: 'Purchase' })",
+      "params": {
+        "locator": "locator('#purchase_1174').getByRole('button', { name: 'Purchase' })"
+      },
+      "location": {
+        "file": "cart.spec.ts",
+        "line": 18,
+        "column": 56
+      }
+    },
+    {
+      "title": "added message",
+      "category": "expect",
+      "subtitle": "getByText('Added to cart')",
+      "params": {
+        "locator": "getByText('Added to cart')"
+      },
+      "location": {
+        "file": "cart.spec.ts",
+        "line": 19,
+        "column": 66
+      }
+    },
+    {
+      "title": "Navigate",
+      "category": "pw:api",
+      "subtitle": "/cart",
+      "params": {
+        "url": "/cart"
+      },
+      "location": {
+        "file": "cart.spec.ts",
+        "line": 21,
+        "column": 14
+      }
+    },
+    {
+      "title": "cart line-item quantity",
+      "category": "expect",
+      "params": {
+        "expected": 3
+      },
+      "location": {
+        "file": "cart.spec.ts",
+        "line": 31,
+        "column": 46
+      }
+    },
+    {
+      "title": "cart subtotal (qty × unit price)",
+      "category": "expect",
+      "params": {
+        "expected": 15
+      },
+      "location": {
+        "file": "cart.spec.ts",
+        "line": 32,
+        "column": 60
+      }
+    },
+    {
+      "title": "After Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture"
+        },
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Close context",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

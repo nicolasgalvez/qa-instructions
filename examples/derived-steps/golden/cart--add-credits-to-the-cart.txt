@@ -1,0 +1,4 @@
+1. Open http://127.0.0.1:4321/shop — **purchase form for 1174** is visible
+2. Type **3** into the **input[name="download_quantity"]** element
+3. Click the **Purchase** button — **Added to cart** is visible
+4. Open http://127.0.0.1:4321/cart — **cart line-item quantity** is **3**; **cart subtotal (qty × unit price)** is **15**

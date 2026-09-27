@@ -1,0 +1,39 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Shop">
+  <h1>Shop</h1>
+  <p>Carbon credits, sold by the tonne. Choose a quantity and add them to your cart.</p>
+  <form id="purchase_1174" class="purchase-form">
+    <h2>Forest carbon credits</h2>
+    <p>$5 per tonne</p>
+    <label>
+      Quantity
+      <input name="download_quantity" type="number" min="1" value="1" />
+    </label>
+    <button type="submit" class="button">Purchase</button>
+  </form>
+  <p id="added" hidden>Added to cart</p>
+  <style>
+    .purchase-form input {
+      display: block;
+      width: 120px;
+      margin-top: 8px;
+      padding: 8px;
+      border: 2px solid #111;
+      font: inherit;
+    }
+  </style>
+  <script is:inline>
+    const form = document.getElementById('purchase_1174');
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const quantity = form.elements.download_quantity.value;
+      localStorage.setItem(
+        'cart',
+        JSON.stringify({ quantity: Number(quantity), unitPrice: 5 }),
+      );
+      document.getElementById('added').hidden = false;
+    });
+  </script>
+</Base>

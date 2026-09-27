@@ -126,13 +126,49 @@ test('a literal first argument is read as written', () => {
  * Reads the check whose matcher is `matcher`, located the way Playwright
  * reports an `expect` step: at the matcher's name.
  */
-function checkSite(source: string, matcher: string) {
+function readCheck(source: string, matcher: string) {
   const lines = source.split('\n');
   const index = lines.findIndex((line) => line.includes(`${matcher}(`));
   const column = lines[index].indexOf(`${matcher}(`) + 1;
   const reader = new CallSiteReader(() => source);
   return reader.readCheck({ file: 'spec.ts', line: index + 1, column });
 }
+
+/** A check's subject and expected value, as read from the source. */
+function checkSite(source: string, matcher: string) {
+  const site = readCheck(source, matcher);
+  if (!site) return undefined;
+  const { subject, expected } = site;
+  return expected === undefined ? { subject } : { subject, expected };
+}
+
+test('a check reads its matcher and whether it is negated from the source', () => {
+  const matcherOf = (source: string, matcher: string) => {
+    const site = readCheck(source, matcher);
+    return site && { matcher: site.matcher, negated: site.negated };
+  };
+  assert.deepEqual(
+    matcherOf(
+      `  expect(cartQty, 'cart line-item quantity').toBe(QTY);`,
+      'toBe',
+    ),
+    { matcher: 'toBe', negated: false },
+  );
+  assert.deepEqual(
+    matcherOf(
+      `  await expect(\n    page.getByText('Saved'),\n    'saved note',\n  ).not.toBeHidden();`,
+      'toBeHidden',
+    ),
+    { matcher: 'toBeHidden', negated: true },
+  );
+  assert.deepEqual(
+    matcherOf(
+      `  expect(total, 'order total')\n    .toBeCloseTo(SUBTOTAL, 2);`,
+      'toBeCloseTo',
+    ),
+    { matcher: 'toBeCloseTo', negated: false },
+  );
+});
 
 test('a check reads its subject and expected value from the source', () => {
   assert.deepEqual(
