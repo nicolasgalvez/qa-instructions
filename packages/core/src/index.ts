@@ -11,6 +11,7 @@ export {
   type ActionCapture,
   type CheckCapture,
   type RecordedElement,
+  type RecordedRegion,
   type Screenshot,
   type ScreenshotSource,
 } from './screenshots/source.js';
@@ -40,6 +41,7 @@ export {
   type ElementName,
   type ElementNameOptions,
 } from './instructions/element-namer.js';
+export { RegionNamer, type RegionName } from './instructions/region-namer.js';
 export { ScriptChangeRule } from './instructions/script-change-rule.js';
 export {
   SecretMasker,

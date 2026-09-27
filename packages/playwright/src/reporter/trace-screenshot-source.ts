@@ -13,6 +13,7 @@ import { ActionRef } from './action-ref.js';
 import { PageStates } from './page-states.js';
 import { RecordingFrames, type RecordedCall } from './recording-frames.js';
 import { Screencast } from './screencast.js';
+import { SelectorParser } from './selector-parser.js';
 import { FrameSnapshots } from './snapshot-dom.js';
 import { SnapshotTarget } from './snapshot-target.js';
 import { TraceArchive, type TraceEvent } from './trace-archive.js';
@@ -76,6 +77,8 @@ type CallRecord = {
   /** Per-action screen snapshots (`snapshots.screen`, Playwright 1.63+). */
   screenshots: ImageRef[];
   method?: unknown;
+  /** The selector the call looked its element up by. */
+  selector?: string;
   pageId?: string;
   startTime?: number;
   endTime?: number;
@@ -110,6 +113,7 @@ class TraceCalls {
   private readonly snapshotTimes = new Map<string, number>();
   /** Each frame's DOM snapshots, by frame id. */
   private readonly frames = new Map<string, FrameSnapshots>();
+  private readonly selectors = new SelectorParser();
   private viewport?: QaSize;
   /** The context's wall-clock time minus its trace-clock time. */
   private wallClockOffset?: number;
@@ -216,6 +220,11 @@ class TraceCalls {
           method: event.method,
           pageId: typeof event.pageId === 'string' ? event.pageId : undefined,
           startTime: this.number(event.startTime),
+          selector:
+            this.isRecord(event.params) &&
+            typeof event.params.selector === 'string'
+              ? event.params.selector
+              : undefined,
           expect: this.expectParams(event),
         });
         break;
@@ -282,7 +291,7 @@ class TraceCalls {
     const target = SnapshotTarget.find(frame.document(index), snapshot.callId);
     if (target) {
       record.passwordField = target.isPasswordField;
-      record.element = target.recorded();
+      record.element = target.recorded(this.selectors.scope(record.selector));
     }
   }
 

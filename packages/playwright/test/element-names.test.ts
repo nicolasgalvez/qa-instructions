@@ -3,7 +3,12 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import { ActionRef, CheckRef } from '../src/reporter/action-ref.js';
+import { findOne } from 'domutils';
+import { parseDocument } from 'htmlparser2';
+
 import { LocatorParser } from '../src/reporter/locator-parser.js';
+import { SelectorParser } from '../src/reporter/selector-parser.js';
+import { SnapshotTarget } from '../src/reporter/snapshot-target.js';
 import { TraceScreenshotSource } from '../src/reporter/trace-screenshot-source.js';
 
 test('a CSS selector tells what kind of element it ends on, never shown to a tester', () => {
@@ -80,18 +85,30 @@ test('with DOM snapshots, the trace says what each element looked like on the pa
   const source = await TraceScreenshotSource.open(NAMES_TRACE);
   const element = (ref: string) => source.capture(ref)?.element;
 
+  // The product form the test narrowed each search to, titled by its heading.
+  const product = {
+    tag: 'form',
+    attributes: { id: 'product_2' },
+    title: 'Energy Certificates',
+    scope: true,
+  };
+
   assert.equal(element(NAMES.navigate), undefined);
   assert.deepEqual(element(NAMES.radio), {
     tag: 'input',
     attributes: { type: 'radio', name: 'price_2' },
     text: '',
     labels: ['One time purchase'],
+    lookalikes: 2,
+    region: product,
   });
   assert.deepEqual(element(NAMES.quantity), {
     tag: 'input',
     attributes: { type: 'number', name: 'quantity', value: '1' },
     text: '',
     labels: [],
+    lookalikes: 2,
+    region: product,
   });
   // A check's element comes through too.
   assert.deepEqual(
@@ -104,6 +121,8 @@ test('with DOM snapshots, the trace says what each element looked like on the pa
     attributes: { type: 'button', class: 'add' },
     text: 'Add to Cart',
     labels: [],
+    lookalikes: 2,
+    region: product,
   });
   // A label pointing at the field by id; text in earlier snapshots is
   // resolved from them.
@@ -115,5 +134,79 @@ test('with DOM snapshots, the trace says what each element looked like on the pa
     attributes: { href: '#cart', 'data-testid': 'view-cart' },
     text: 'View cart',
     labels: [],
+    lookalikes: 1,
   });
+  // Found on the whole page and one of a kind: no part of the page to name.
+  assert.equal(element(NAMES.note)?.region, undefined);
+  assert.equal(element(NAMES.gift)?.region, undefined);
+});
+
+test('the part of the page an element is in comes from the test scope, else from the page', () => {
+  const selectors = new SelectorParser();
+  assert.equal(
+    selectors.scope(`#product_2 >> input[name="quantity"] >> nth=0`),
+    '#product_2',
+  );
+  assert.equal(
+    selectors.scope(
+      `#p >> internal:role=button[name="Add to Cart"i] >> visible=true`,
+    ),
+    '#p',
+  );
+  // Not scoped, or scoped by something that is not plain CSS.
+  assert.equal(selectors.scope(`input[name="quantity"]`), undefined);
+  assert.equal(
+    selectors.scope(`internal:role=form >> input[name="quantity"]`),
+    undefined,
+  );
+
+  const target = (html: string, scope?: string) => {
+    const document = parseDocument(html);
+    const marked = findOne(
+      (el) => '__playwright_target__' in el.attribs,
+      document.children,
+    );
+    assert.ok(marked);
+    return SnapshotTarget.find({ document, own: [marked] }, 'call@1')?.recorded(
+      scope,
+    );
+  };
+  const cards = (inner: string) => `<body>
+    <section class="card"><h2>Basic</h2><div><input name="q" __playwright_target__="call@1"></div></section>
+    <section class="card"><h2>Pro</h2><div><input name="q"></div></section>
+    ${inner}</body>`;
+
+  // Lookalikes elsewhere: the nearest titled part holding no other one.
+  assert.deepEqual(target(cards(''))?.region, {
+    tag: 'section',
+    attributes: { class: 'card' },
+    title: 'Basic',
+    scope: false,
+  });
+  assert.equal(target(cards(''))?.lookalikes, 2);
+  // A part titled by the heading just before it.
+  assert.deepEqual(
+    target(
+      `<body><h2>Basic</h2><form id="a"><input name="q" __playwright_target__="call@1"></form>
+       <h2>Pro</h2><form id="b"><input name="q"></form></body>`,
+      '#a',
+    )?.region,
+    { tag: 'form', attributes: { id: 'a' }, title: 'Basic', scope: true },
+  );
+  // A scope a tester cannot see (the page body) names no part.
+  assert.equal(
+    target(
+      `<body><h1>Store</h1><input name="q" __playwright_target__="call@1"></body>`,
+      'body',
+    )?.region,
+    undefined,
+  );
+  // A heading holding the element itself does not title its part.
+  assert.equal(
+    target(
+      `<body><div><h2><a href="#" __playwright_target__="call@1">Basic</a></h2></div>
+       <div><h2><a href="#">Basic</a></h2></div></body>`,
+    )?.region,
+    undefined,
+  );
 });

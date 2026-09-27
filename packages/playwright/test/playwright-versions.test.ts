@@ -144,13 +144,17 @@ test('Playwright 1.56 with a trace reads checks on variables and computed values
         action: 'Open http://127.0.0.1:4321/shop',
         expected: '**purchase form for 1174** is visible',
       },
-      // The field's label, as the page was recorded.
+      // The field's label, as the page was recorded, and the product form
+      // the test found it in, by that form's heading.
       {
-        action: 'Type **3** into **Quantity**',
-        expected: '**Quantity** shows **3**',
+        action:
+          'Type **3** into **Quantity** in the **Forest carbon credits** form',
+        expected:
+          '**Quantity** in the **Forest carbon credits** form shows **3**',
       },
       {
-        action: 'Click the **Purchase** button',
+        action:
+          'Click the **Purchase** button in the **Forest carbon credits** form',
         expected: '**Added to cart** is visible',
       },
       {

@@ -35,11 +35,33 @@ export class SelectorParser {
     return undefined;
   }
 
-  private toTarget(part: string): ElementTarget | undefined {
+  /**
+   * The CSS of the element the selector narrows its search to, e.g.
+   * `#purchase_1174` in `#purchase_1174 >> input[name="qty"] >> nth=0`:
+   * the nearest part before the one the target comes from that finds an
+   * element. Undefined when there is none, or it is not plain CSS.
+   */
+  scope(selector: string | undefined): string | undefined {
+    if (!selector) return undefined;
+    const parts = this.split(selector);
+    const finding = parts.flatMap((part, i) =>
+      this.toTarget(part) ? [i] : [],
+    );
+    const outer = finding.at(-2);
+    if (outer === undefined) return undefined;
+    const { engine, body } = this.engine(parts[outer]);
+    return engine === undefined || engine === 'css' ? body : undefined;
+  }
+
+  private engine(part: string): { engine?: string; body: string } {
     const eq = part.indexOf('=');
     const engine =
       eq > 0 && ENGINE.test(part.slice(0, eq)) ? part.slice(0, eq) : undefined;
-    const body = engine === undefined ? part : part.slice(eq + 1);
+    return { engine, body: engine === undefined ? part : part.slice(eq + 1) };
+  }
+
+  private toTarget(part: string): ElementTarget | undefined {
+    const { engine, body } = this.engine(part);
 
     switch (engine) {
       case undefined:

@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@qa-instructions/core": "workspace:*",
+    "css-select": "^6.0.0",
     "css-what": "^7.0.0",
     "domhandler": "^5.0.3",
     "domutils": "^3.2.2",
@@ -24,6 +25,7 @@
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.0.0",
     "@types/pngjs": "^6.0.5",
+    "htmlparser2": "^10.1.0",
     "pngjs": "^7.0.0",
     "typescript": "^5.7.0"
   },
