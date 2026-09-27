@@ -176,10 +176,13 @@ class TraceCalls {
       endTime: record.endTime,
       inputSnapshot: record.inputSnapshot,
       inputTime: this.inputTime(record),
+      afterSnapshot:
+        record.callId === undefined ? undefined : `after@${record.callId}`,
       marks: record.point !== undefined || record.box !== undefined,
       nextChange,
       changedPage: this.pageChanged(record),
       settledAt: this.settledAt(record, nextChange),
+      stillAt: this.stillAt(record, nextChange),
     };
   }
 
@@ -194,19 +197,41 @@ class TraceCalls {
     record: CallRecord,
     nextChange: number,
   ): number | undefined {
-    const end = record.endTime ?? record.startTime;
-    if (end === undefined || record.pageId === undefined) return undefined;
-    const checks = this.stabilityChecks.get(record.pageId) ?? [];
-    const moving = checks
-      .filter(({ still, time }) => !still && time > end && time < nextChange)
+    const moving = this.checksAfter(record, nextChange)
+      .filter(({ still }) => !still)
       .map(({ time }) => time);
     if (moving.length === 0) return undefined;
     const lastMoving = Math.max(...moving);
+    const checks = this.stabilityChecks.get(record.pageId ?? '') ?? [];
     return Math.min(
       Infinity,
       ...checks
         .filter(({ still, time }) => still && time > lastMoving)
         .map(({ time }) => time),
+    );
+  }
+
+  /**
+   * When a later Action last found the page still after the call ended and
+   * before the next call changed it, provided none saw it moving then.
+   */
+  private stillAt(record: CallRecord, nextChange: number): number | undefined {
+    const checks = this.checksAfter(record, nextChange);
+    if (checks.length === 0 || checks.some(({ still }) => !still)) {
+      return undefined;
+    }
+    return Math.max(...checks.map(({ time }) => time));
+  }
+
+  /** The page's stability checks after the call ended and before the next change. */
+  private checksAfter(
+    record: CallRecord,
+    nextChange: number,
+  ): StabilityCheck[] {
+    const end = record.endTime ?? record.startTime;
+    if (end === undefined || record.pageId === undefined) return [];
+    return (this.stabilityChecks.get(record.pageId) ?? []).filter(
+      ({ time }) => time > end && time < nextChange,
     );
   }
 
