@@ -5,8 +5,8 @@
   "scripts": {
     "test": "playwright test",
     "test:failing": "node scripts/run-failing.mjs",
-    "render": "node ../../packages/cli/dist/index.js render qa-runs --format qa-steps --out qa-steps-out && node ../../packages/cli/dist/index.js render qa-runs/collapse --format qa-steps --out qa-steps-out/collapse && node ../../packages/cli/dist/index.js render qa-runs/ignore --format qa-steps --out qa-steps-out/ignore",
-    "render:failing": "node ../../packages/cli/dist/index.js render qa-runs/failing --format qa-steps --out qa-steps-out/failing",
+    "render": "node scripts/render.mjs qa-runs:qa-steps-out qa-runs/collapse:qa-steps-out/collapse qa-runs/ignore:qa-steps-out/ignore",
+    "render:failing": "node scripts/render.mjs qa-runs/failing:qa-steps-out/failing",
     "verify": "node scripts/verify-run.mjs",
     "verify:update-goldens": "node scripts/update-goldens.mjs",
     "e2e:selection": "rm -rf qa-runs-selection && playwright test --config playwright.selection.config.ts && node scripts/verify-selection.mjs",

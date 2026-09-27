@@ -74,6 +74,17 @@ qa-instructions render qa-runs/ --format qa-steps --out qa-steps-out/
 
 Paste `qa-steps-out/*.txt` into your ticket's QA Steps.
 
+Every format shows the same QA Steps, Expected Results, Sections, warnings, and status:
+
+| `--format` | Output                              | Step Screenshots                                                                                                 |
+| ---------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `qa-steps` | `<test>.txt`, Jira-ready plain text | None                                                                                                             |
+| `markdown` | `<test>.md`, PR-ready Markdown      | Inline under each step, linked relatively; copied to `<out>/<test>/` so the links work from the output directory |
+| `html`     | `<test>.html`, a standalone page    | Embedded as data URIs, so the one file works offline, from disk, or as a CI artifact                             |
+| `json`     | `<test>.json`, the bundle itself    | Not included                                                                                                     |
+
+The HTML page has inline styles for light and dark color schemes, no scripts or fonts, and a Content Security Policy that blocks all network requests. Screenshots are embedded rather than copied alongside because they are small (tens of KB per step), and one file is easier to share.
+
 ## Architecture
 
 ```
@@ -82,7 +93,7 @@ Playwright reporter (adapter)  →  core (test events → QA Instructions)  → 
 
 - The core is runner-independent: it accepts a neutral stream of test events and knows nothing about Playwright or Jest.
 - The Playwright reporter is a thin adapter that translates reporter steps into those events.
-- Renderers are pure functions from bundle to text; adding an output format touches only the renderer.
+- Renderers are pure: bundle in, output out. One shared view model walks the bundle once, and the text, Markdown, and HTML renderers each format that view, so they cannot drift apart. The CLI supplies screenshot bytes or links; adding an output format touches only a renderer.
 
 See [docs/design.md](./docs/design.md) and [ADR 0001](./docs/adr/0001-reporter-derived-qa-steps.md). Vocabulary is in [CONTEXT.md](./CONTEXT.md).
 

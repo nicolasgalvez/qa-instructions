@@ -8,6 +8,7 @@ import {
   OUTPUT_DIRS,
   SCREENSHOT_GOLDENS,
   SECRETS,
+  normalizeRendered,
   root,
 } from './goldens.mjs';
 
@@ -99,13 +100,57 @@ async function verifyScreenshots(goldenFile) {
   }
 }
 
-for (const { rendered, golden } of GOLDENS) {
+/** The images a rendered page shows, in order: embedded or linked. */
+async function renderedImages(rendered, content) {
+  if (rendered.endsWith('.html')) {
+    return [...content.matchAll(/src="data:image\/png;base64,([^"]+)"/g)].map(
+      ([, base64]) => Buffer.from(base64, 'base64'),
+    );
+  }
+  const dir = path.dirname(path.join(root, rendered));
+  return Promise.all(
+    [...content.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(([, link]) =>
+      readFile(path.join(dir, decodeURIComponent(link))),
+    ),
+  );
+}
+
+/** Each rendered image must be the Step Screenshot of its step, in order. */
+async function verifyImages(rendered, bundleDir, content) {
+  const dir = path.join(root, bundleDir);
+  const bundle = JSON.parse(
+    await readFile(path.join(dir, 'bundle.json'), 'utf8'),
+  );
+  const expected = await Promise.all(
+    bundle.steps
+      .filter((step) => step.assetIds?.length)
+      .map((step) =>
+        readFile(
+          path.join(dir, 'assets', bundle.assets[step.assetIds[0]].filename),
+        ),
+      ),
+  );
+  const actual = await renderedImages(rendered, content);
+  if (actual.length !== expected.length) {
+    fail(
+      `${rendered}: shows ${actual.length} images, expected ${expected.length}`,
+    );
+    return;
+  }
+  actual.forEach((image, i) => {
+    if (!image.equals(expected[i])) {
+      fail(`${rendered}: image ${i + 1} is not its step's Step Screenshot`);
+    }
+  });
+}
+
+for (const { rendered, golden, bundleDir } of GOLDENS) {
   const actualPath = path.join(root, rendered);
   const goldenPath = path.join(root, golden);
 
-  let actual;
+  let content;
   try {
-    actual = await readFile(actualPath, 'utf8');
+    content = await readFile(actualPath, 'utf8');
   } catch (error) {
     console.error(
       `verify-run: missing rendered output ${rendered}: ${error.message}`,
@@ -114,6 +159,15 @@ for (const { rendered, golden } of GOLDENS) {
     continue;
   }
 
+  if (bundleDir) {
+    try {
+      await verifyImages(rendered, bundleDir, content);
+    } catch (error) {
+      fail(`${rendered}: ${error.message}`);
+    }
+  }
+
+  const actual = normalizeRendered(rendered, content);
   const expected = await readFile(goldenPath, 'utf8');
   if (actual !== expected) {
     failed = true;
