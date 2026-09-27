@@ -10,7 +10,8 @@
     "test": "node --test dist-test/**/*.test.js"
   },
   "dependencies": {
-    "@qa-instructions/core": "workspace:*"
+    "@qa-instructions/core": "workspace:*",
+    "fflate": "^0.8.3"
   },
   "peerDependencies": {
     "@playwright/test": ">=1.51.0"
@@ -18,6 +19,8 @@
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.0.0",
+    "@types/pngjs": "^6.0.5",
+    "pngjs": "^7.0.0",
     "typescript": "^5.7.0"
   },
   "files": [

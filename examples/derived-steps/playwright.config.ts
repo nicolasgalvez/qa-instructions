@@ -20,6 +20,8 @@ export default defineConfig({
   use: {
     baseURL,
     viewport: { width: 800, height: 600 },
+    // Step Screenshots: one screen snapshot per action (Playwright 1.63+).
+    trace: { mode: 'on', snapshots: { screen: true } },
   },
   webServer: {
     command: 'pnpm --filter @qa-instructions/fixture-site dev',

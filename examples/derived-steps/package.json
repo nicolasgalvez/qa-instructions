@@ -13,9 +13,10 @@
     "e2e": "pnpm test && pnpm test:failing && pnpm render && pnpm render:failing && pnpm verify && pnpm e2e:selection"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@qa-instructions/cli": "workspace:*",
     "@qa-instructions/fixture-site": "workspace:*",
     "@qa-instructions/playwright": "workspace:*",
-    "@playwright/test": "^1.63.0"
+    "pngjs": "^7.0.0"
   }
 }

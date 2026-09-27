@@ -3,8 +3,16 @@ export * from './events.js';
 export {
   QaInstructionsRecorder,
   type QaInstructionsRecorderOptions,
+  type QaRecording,
   type SectionPresentation,
 } from './instructions/recorder.js';
+export {
+  NoScreenshots,
+  type ActionCapture,
+  type Screenshot,
+  type ScreenshotSource,
+} from './screenshots/source.js';
+export { StepScreenshotPicker } from './screenshots/picker.js';
 export { StepPhraser } from './instructions/phraser.js';
 export { ScriptChangeRule } from './instructions/script-change-rule.js';
 export { TestSelection, type TestSelectionOptions } from './selection.js';

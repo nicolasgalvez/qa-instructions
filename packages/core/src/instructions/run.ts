@@ -1,12 +1,18 @@
 import { BundleDirNamer } from '../bundle/dir-namer.js';
 import type { TestEvent, TestEventSink, TestStartEvent } from '../events.js';
 import type { QaRunBundle } from '../model.js';
-import { QaInstructionsRecorder } from './recorder.js';
+import type { ScreenshotSource } from '../screenshots/source.js';
+import { QaInstructionsRecorder, type QaRecording } from './recorder.js';
 
 /** One test's QA Instructions and the directory its bundle belongs in. */
 export type QaInstructionsResult = {
   dirName: string;
+  /** The test attempt the QA Instructions come from. */
+  start: TestStartEvent;
+  /** The QA Instructions as text only. */
   bundle: QaRunBundle;
+  /** The QA Instructions with Step Screenshots from `screenshots`. */
+  record(screenshots: ScreenshotSource): QaRecording;
 };
 
 type RecordedTest = {
@@ -53,9 +59,11 @@ export class QaInstructionsRun implements TestEventSink {
         line: start.line,
       })),
     );
-    return tests.map(({ recorder }, index) => ({
+    return tests.map(({ start, recorder }, index) => ({
       dirName: names[index],
+      start,
       bundle: recorder.toBundle(),
+      record: (screenshots) => recorder.toRecording(screenshots),
     }));
   }
 

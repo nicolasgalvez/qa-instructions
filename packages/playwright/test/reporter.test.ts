@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import type { TestCase, TestResult, TestStep } from '@playwright/test/reporter';
@@ -25,6 +26,7 @@ type Attempt = {
   status?: TestResult['status'];
   retry?: number;
   steps: StepSpec[];
+  attachments?: TestResult['attachments'];
 };
 
 function step(spec: StepSpec): TestStep {
@@ -55,26 +57,31 @@ async function runAttempts(
 ): Promise<{
   dirs: string[];
   bundle: QaRunBundle;
+  assetFiles: string[];
 }> {
   const out = await mkdtemp(path.join(tmpdir(), 'qa-reporter-'));
   try {
     const reporter = new QaInstructionsReporter({ ...options, outputDir: out });
-    for (const { status = 'passed', retry = 0, steps } of attempts) {
+    for (const {
+      status = 'passed',
+      retry = 0,
+      steps,
+      attachments = [],
+    } of attempts) {
       await reporter.onTestEnd(mockTestCase(), {
         status,
         retry,
-        attachments: [],
+        attachments,
         steps: steps.map(step),
       } as unknown as TestResult);
     }
     await reporter.onEnd();
-    const raw = await readFile(
-      path.join(out, 'sign-in--sign-in-with-bad-credentials', 'bundle.json'),
-      'utf8',
-    );
+    const dir = path.join(out, 'sign-in--sign-in-with-bad-credentials');
+    const raw = await readFile(path.join(dir, 'bundle.json'), 'utf8');
     return {
       dirs: await readdir(out),
       bundle: JSON.parse(raw) as QaRunBundle,
+      assetFiles: (await readdir(path.join(dir, 'assets'))).sort(),
     };
   } finally {
     await rm(out, { recursive: true, force: true });
@@ -532,6 +539,135 @@ test('reporter warns where the test changed the page by script and marks forced 
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+const sampleTrace: TestResult['attachments'] = [
+  {
+    name: 'trace',
+    contentType: 'application/zip',
+    path: fileURLToPath(
+      new URL('../../test/fixtures/traces/v9.zip', import.meta.url),
+    ),
+  },
+];
+
+// The reporter steps of test/fixtures/traces/scenario.spec.ts.
+const sampleSteps: StepSpec[] = [
+  {
+    category: 'hook',
+    title: 'Before Hooks',
+    steps: [
+      {
+        category: 'fixture',
+        title: 'Fixture "browser"',
+        steps: [{ category: 'pw:api', title: 'Launch browser' }],
+      },
+      {
+        category: 'fixture',
+        title: 'Fixture "context"',
+        steps: [{ category: 'pw:api', title: 'Create context' }],
+      },
+      {
+        category: 'fixture',
+        title: 'Fixture "page"',
+        steps: [{ category: 'pw:api', title: 'Create page' }],
+      },
+    ],
+  },
+  { category: 'pw:api', title: 'Navigate', params: { url: 'data:text/html,' } },
+  {
+    category: 'expect',
+    title: 'Expect "toBeVisible"',
+    params: { locator: "getByRole('button', { name: 'Paint' })" },
+  },
+  {
+    category: 'test.step',
+    title: 'fill in the form',
+    steps: [
+      {
+        category: 'pw:api',
+        title: 'Fill "Ada"',
+        params: { locator: "getByLabel('Name')", value: 'Ada' },
+      },
+    ],
+  },
+  { category: 'expect', title: 'Expect "toBe"', params: { expected: 'Paint' } },
+  {
+    category: 'pw:api',
+    title: 'Click',
+    params: { locator: "getByRole('button', { name: 'Paint' })" },
+  },
+  { category: 'pw:api', title: 'Press "Tab"', params: { key: 'Tab' } },
+  closeContext,
+];
+
+test('with the trace setting on, each QA Step gets a Step Screenshot from the trace', async () => {
+  const { bundle, assetFiles } = await runAttempts([
+    { steps: sampleSteps, attachments: sampleTrace },
+  ]);
+
+  assert.deepEqual(
+    bundle.steps.map(({ action, assetIds, screenshotMoment }) => ({
+      action,
+      assetIds,
+      screenshotMoment,
+    })),
+    [
+      {
+        action: 'Open data:text/html,',
+        assetIds: ['step-01'],
+        screenshotMoment: 'after',
+      },
+      {
+        action: 'Type **Ada** into **Name**',
+        assetIds: ['step-02'],
+        screenshotMoment: 'action',
+      },
+      {
+        action: 'Click the **Paint** button',
+        assetIds: ['step-03'],
+        screenshotMoment: 'action',
+      },
+      {
+        action: 'Press **Tab**',
+        assetIds: ['step-04'],
+        screenshotMoment: 'action',
+      },
+    ],
+  );
+  assert.deepEqual(assetFiles, [
+    'step-01.png',
+    'step-02.png',
+    'step-03.png',
+    'step-04.png',
+  ]);
+  assert.deepEqual(bundle.steps[2].elementBox, {
+    x: 40,
+    y: 40,
+    width: 120,
+    height: 40,
+  });
+  assert.deepEqual(bundle.steps[2].clickPoint, { x: 100, y: 60 });
+});
+
+test('Step Screenshots come from the trace of the attempt that is kept', async () => {
+  const lastHasTrace = await runAttempts([
+    { status: 'failed', retry: 0, steps: sampleSteps },
+    { retry: 1, steps: sampleSteps, attachments: sampleTrace },
+  ]);
+  assert.equal(lastHasTrace.assetFiles.length, 4);
+
+  const onlyFirstHasTrace = await runAttempts([
+    {
+      status: 'failed',
+      retry: 0,
+      steps: sampleSteps,
+      attachments: sampleTrace,
+    },
+    { retry: 1, steps: sampleSteps },
+  ]);
+  assert.deepEqual(onlyFirstHasTrace.assetFiles, []);
+  assert.equal(onlyFirstHasTrace.bundle.steps[0].assetIds, undefined);
 });
 
 test('reporter never throws into the test run', async () => {

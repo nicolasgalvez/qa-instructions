@@ -9,7 +9,14 @@ import type {
   TestStartEvent,
   UserActionKind,
 } from '../events.js';
-import type { QaRunBundle } from '../model.js';
+import type { QaAssetInput, QaRunBundle, QaStepInput } from '../model.js';
+import { StepScreenshotPicker } from '../screenshots/picker.js';
+import {
+  NoScreenshots,
+  type ActionCapture,
+  type Screenshot,
+  type ScreenshotSource,
+} from '../screenshots/source.js';
 import { StepPhraser } from './phraser.js';
 import { ScriptChangeRule } from './script-change-rule.js';
 
@@ -45,6 +52,18 @@ export type QaInstructionsRecorderOptions = {
   scriptChanges?: ScriptChangeRule;
   /** Default `sections`. */
   sections?: SectionPresentation;
+  picker?: StepScreenshotPicker;
+};
+
+/** QA Instructions plus the Step Screenshots their bundle refers to. */
+export type QaRecording = {
+  bundle: QaRunBundle;
+  assets: QaAssetInput[];
+};
+
+const FILE_EXTENSIONS: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
 };
 
 type PendingStep = {
@@ -55,6 +74,8 @@ type PendingStep = {
   failed?: boolean;
   warning?: boolean;
   approximate?: boolean;
+  /** The Action's ref, for its Step Screenshot. */
+  ref?: string;
 };
 
 /**
@@ -67,11 +88,15 @@ type PendingStep = {
  * A test that does not pass yields incomplete QA Instructions: the QA Steps
  * stop at the first failed Action or check, and the step it belongs to is
  * marked as the failing step.
+ *
+ * Given a screenshot source, each QA Step also gets the Step Screenshot of
+ * its Action, and the element box and click point where known.
  */
 export class QaInstructionsRecorder implements TestEventSink {
   private readonly steps: PendingStep[] = [];
   private readonly phraser: StepPhraser;
   private readonly scriptChanges: ScriptChangeRule;
+  private readonly picker: StepScreenshotPicker;
   private readonly presentation: SectionPresentation;
   /** Titles of the open groups, outermost first. */
   private readonly groups: string[] = [];
@@ -85,6 +110,7 @@ export class QaInstructionsRecorder implements TestEventSink {
     this.phraser = options.phraser ?? new StepPhraser();
     this.scriptChanges = options.scriptChanges ?? new ScriptChangeRule();
     this.presentation = options.sections ?? 'sections';
+    this.picker = options.picker ?? new StepScreenshotPicker();
   }
 
   /** Which attempt of the test this recorder saw; 1 unless retried. */
@@ -122,7 +148,15 @@ export class QaInstructionsRecorder implements TestEventSink {
     }
   }
 
+  /** The QA Instructions as text only. */
   toBundle(): QaRunBundle {
+    return this.toRecording().bundle;
+  }
+
+  /** The QA Instructions with Step Screenshots from `screenshots`. */
+  toRecording(
+    screenshots: ScreenshotSource = new NoScreenshots(),
+  ): QaRecording {
     const builder = createBundleBuilder();
     const title = this.start?.title ?? '';
     builder.guide({ title });
@@ -138,7 +172,12 @@ export class QaInstructionsRecorder implements TestEventSink {
       !this.end || this.end.status === 'passed' ? 'complete' : 'incomplete',
     );
 
-    for (const step of this.steps) {
+    this.steps.forEach((step, i) => {
+      const capture =
+        step.ref === undefined ? undefined : screenshots.capture(step.ref);
+      const screenshot = this.picker.pick(capture?.screenshots ?? []);
+      const asset = screenshot && this.screenshotAsset(i + 1, screenshot);
+      if (asset) builder.addAsset(asset);
       builder.addStep({
         action: step.action,
         url: step.url,
@@ -147,9 +186,10 @@ export class QaInstructionsRecorder implements TestEventSink {
         failed: step.failed,
         warning: step.warning,
         approximate: step.approximate,
+        ...this.captureFields(capture, screenshot, asset),
       });
-    }
-    return builder.toBundle();
+    });
+    return { bundle: builder.toBundle(), assets: builder.pendingAssets() };
   }
 
   /** Nothing after the first failure is a QA Step: the tester stops there. */
@@ -166,7 +206,7 @@ export class QaInstructionsRecorder implements TestEventSink {
     const url =
       event.kind === 'navigate' ? this.resolveUrl(event.url) : undefined;
     if (this.presentation === 'collapse' && this.groups.length > 0) {
-      this.collapseInto(this.groups[0], url, event.failed);
+      this.collapseInto(this.groups[0], url, event);
       return;
     }
     this.steps.push({
@@ -176,13 +216,15 @@ export class QaInstructionsRecorder implements TestEventSink {
       expectedResults: [],
       failed: event.failed,
       approximate: event.forced === true,
+      ref: event.ref,
     });
   }
 
   /**
    * Adds a warning step where the test changed the page by script. It is
    * never folded into a collapsed group: the group's later Actions start a
-   * new step after it, so the order stays true.
+   * new step after it, so the order stays true. Its screenshot shows the
+   * page the script left.
    */
   private warn(event: ActionEvent): void {
     this.collapsedStep = undefined;
@@ -191,21 +233,26 @@ export class QaInstructionsRecorder implements TestEventSink {
       section: this.currentSection(),
       expectedResults: [],
       warning: true,
+      ref: event.ref,
     });
   }
 
-  /** Folds an Action into the one QA Step named after its outermost group. */
+  /**
+   * Folds an Action into the one QA Step named after its outermost group.
+   * The step's screenshot is the group's first Action.
+   */
   private collapseInto(
     title: string,
     url: string | undefined,
-    failed: boolean | undefined,
+    event: ActionEvent,
   ): void {
     if (!this.collapsedStep) {
       this.collapsedStep = { action: title, expectedResults: [] };
       this.steps.push(this.collapsedStep);
     }
     this.collapsedStep.url ??= url;
-    if (failed) this.collapsedStep.failed = true;
+    this.collapsedStep.ref ??= event.ref;
+    if (event.failed) this.collapsedStep.failed = true;
   }
 
   private currentSection(): string[] | undefined {
@@ -238,6 +285,33 @@ export class QaInstructionsRecorder implements TestEventSink {
     } catch {
       return url;
     }
+  }
+
+  private screenshotAsset(
+    stepIndex: number,
+    screenshot: Screenshot,
+  ): QaAssetInput {
+    const id = `step-${String(stepIndex).padStart(2, '0')}`;
+    const extension = FILE_EXTENSIONS[screenshot.contentType] ?? 'bin';
+    return {
+      id,
+      contentType: screenshot.contentType,
+      filename: `${id}.${extension}`,
+      data: screenshot.data,
+    };
+  }
+
+  private captureFields(
+    capture: ActionCapture | undefined,
+    screenshot: Screenshot | undefined,
+    asset: QaAssetInput | undefined,
+  ): Partial<QaStepInput> {
+    return {
+      assetIds: asset && [asset.id],
+      screenshotMoment: screenshot?.moment,
+      elementBox: capture?.box,
+      clickPoint: capture?.point,
+    };
   }
 
   private expectedResult(phrases: string[]): string | undefined {

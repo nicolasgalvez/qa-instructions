@@ -11,6 +11,7 @@ import {
   type SectionPresentation,
 } from '@qa-instructions/core';
 
+import { AttemptTraces } from './attempt-traces.js';
 import { PlaywrightStepTranslator } from './step-translator.js';
 
 export type QaInstructionsReporterOptions = {
@@ -44,6 +45,7 @@ export default class QaInstructionsReporter implements Reporter {
     private readonly run = new QaInstructionsRun(
       () => new QaInstructionsRecorder({ sections: options.testSteps }),
     ),
+    private readonly traces = new AttemptTraces(),
   ) {
     this.outputDir = options.outputDir ?? 'qa-runs';
     this.selection = new TestSelection(options.select);
@@ -61,12 +63,16 @@ export default class QaInstructionsReporter implements Reporter {
       for (const event of this.translator.translate(test, result)) {
         this.run.handle(event);
       }
+      this.traces.add(test.id, result.retry + 1, result.attachments);
     } catch (error) {
       this.warn(test.title, error);
     }
   }
 
-  /** Writes one bundle per test once every attempt has been seen. */
+  /**
+   * Writes one bundle per test once every attempt has been seen, with Step
+   * Screenshots from the trace of the attempt it came from.
+   */
   async onEnd(): Promise<void> {
     let results: QaInstructionsResult[] = [];
     try {
@@ -74,11 +80,20 @@ export default class QaInstructionsReporter implements Reporter {
     } catch (error) {
       this.warn('this run', error);
     }
-    for (const { dirName, bundle } of results) {
+    for (const result of results) {
       try {
-        await writeBundle(path.join(this.outputDir, dirName), bundle, []);
+        const screenshots = await this.traces.screenshots(
+          result.start.id,
+          result.start.attempt,
+        );
+        const { bundle, assets } = result.record(screenshots);
+        await writeBundle(
+          path.join(this.outputDir, result.dirName),
+          bundle,
+          assets,
+        );
       } catch (error) {
-        this.warn(bundle.meta.title, error);
+        this.warn(result.bundle.meta.title, error);
       }
     }
   }
