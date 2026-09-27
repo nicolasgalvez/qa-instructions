@@ -1,2 +1,2 @@
-1. Open http://127.0.0.1:4321/
+1. Open http://127.0.0.1:4321/ — **first attempt is flaky** is more than **0**
 2. Click the **Sign in** link — The page title is **Sign in**
