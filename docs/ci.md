@@ -7,8 +7,19 @@
 | Workflow                         | Runner          | When                      |
 | -------------------------------- | --------------- | ------------------------- |
 | `ci.yml`                         | `ubuntu-latest` | Every PR + push to `main` |
-| `e2e.yml`                        | `ubuntu-latest` | Push to `main` only       |
+| `e2e.yml`                        | `ubuntu-latest` | Every PR + push to `main` |
 | `jira.yml`, `release-please.yml` | `ubuntu-latest` | Events as configured      |
+
+## Required checks
+
+The `protect` ruleset on `main` requires two status checks. A PR cannot merge until both pass.
+
+| Check                 | Job                          |
+| --------------------- | ---------------------------- |
+| `lint + test + build` | `ci.yml` → `lint-test-build` |
+| `e2e goldens`         | `e2e.yml` → `e2e`            |
+
+Neither workflow uses `paths-ignore` on `pull_request`. A required check that never reports leaves the PR blocked, so docs-only PRs must run both. Renaming a job's `name:` breaks its required check; update the ruleset in the same change.
 
 ## Self-hosted on `ruby`
 
