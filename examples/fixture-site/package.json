@@ -2,10 +2,14 @@
   "name": "@qa-instructions/fixture-site",
   "private": true,
   "type": "module",
+  "exports": {
+    "./origin": "./origin.mjs"
+  },
   "scripts": {
-    "dev": "astro dev --host 127.0.0.1 --port 4321",
+    "dev": "astro dev --host 127.0.0.1 --port ${FIXTURE_PORT:-4321}",
     "build": "astro build",
-    "preview": "astro preview --host 127.0.0.1 --port 4321"
+    "preview": "astro preview --host 127.0.0.1 --port ${FIXTURE_PORT:-4321}",
+    "test": "node --test test/*.test.mjs"
   },
   "devDependencies": {
     "astro": "^5.7.0"

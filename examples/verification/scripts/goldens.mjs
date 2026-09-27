@@ -2,6 +2,11 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  FixtureOrigin,
+  fixtureOrigin,
+} from '@qa-instructions/fixture-site/origin';
+
 export const root = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   '..',
@@ -36,12 +41,22 @@ export function normalizeBundle(raw) {
   }
   for (const step of bundle.steps) {
     if (step.url) {
-      step.url = step.url.replace(/^https?:\/\/[^/]+/, 'http://127.0.0.1:4321');
+      step.url = step.url.replace(
+        /^https?:\/\/[^/]+/,
+        FixtureOrigin.canonical.url,
+      );
     }
   }
   return bundle;
 }
 
+/** A bundle as its golden stores it: on the canonical fixture-site port. */
 export async function readNormalizedBundle(filePath) {
-  return normalizeBundle(JSON.parse(await readFile(filePath, 'utf8')));
+  const text = fixtureOrigin.canonicalize(await readFile(filePath, 'utf8'));
+  return normalizeBundle(JSON.parse(text));
+}
+
+/** The rendered QA Steps as the golden stores them: on the canonical port. */
+export async function readRenderedQaSteps() {
+  return fixtureOrigin.canonicalize(await readFile(QA_STEPS.rendered, 'utf8'));
 }

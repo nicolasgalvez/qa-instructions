@@ -80,3 +80,5 @@ Before push (saves hosted/self-hosted cycles):
 ```bash
 pnpm verify   # examples/verification: test → render → golden probes
 ```
+
+The examples serve the fixture site on port 4321. Set `FIXTURE_PORT` (e.g. `FIXTURE_PORT=4400 pnpm verify`) to run on another port, such as a second worktree's run alongside the first; goldens still compare against 4321.

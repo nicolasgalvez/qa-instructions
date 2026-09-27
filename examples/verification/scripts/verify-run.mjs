@@ -5,6 +5,7 @@ import {
   QA_STEPS,
   bundleDirName,
   readNormalizedBundle,
+  readRenderedQaSteps,
 } from './goldens.mjs';
 
 function fail(message) {
@@ -27,7 +28,7 @@ try {
 }
 
 try {
-  const qaSteps = await readFile(QA_STEPS.rendered, 'utf8');
+  const qaSteps = await readRenderedQaSteps();
   const goldenSteps = await readFile(QA_STEPS.golden, 'utf8');
   if (qaSteps !== goldenSteps) {
     fail('qa-steps.txt does not match golden');
