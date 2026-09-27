@@ -80,6 +80,16 @@ const SKIPPABLE_METHODS: ReadonlySet<unknown> = new Set(['check', 'uncheck']);
 /** The log line a pointer action writes as it starts scrolling to its element. */
 const SCROLL_LOG = /scrolling into view/;
 
+/**
+ * The log lines a pointer action writes as it checks whether its element has
+ * stopped moving (its box the same over two animation frames).
+ */
+const MOVING_LOG = /element is not stable/;
+const STILL_LOG = /element is visible, enabled and stable/;
+
+/** One such check: when it was logged and whether the element was still. */
+type StabilityCheck = { time: number; still: boolean };
+
 /** Why a trace gave no screenshots, when it was attached but could not be used. */
 export type TraceProblem =
   | { kind: 'unsupportedVersion'; version: unknown }
@@ -129,6 +139,8 @@ class TraceCalls {
   readonly pages = new PageStates();
   private readonly callByStep = new Map<string, string>();
   private readonly records = new Map<string, CallRecord>();
+  /** Every page's stability checks, in the order logged, by page id. */
+  private readonly stabilityChecks = new Map<string, StabilityCheck[]>();
   /** When each DOM snapshot was taken, by snapshot name. */
   private readonly snapshotTimes = new Map<string, number>();
   /** Each frame's DOM snapshots, by frame id. */
@@ -157,6 +169,7 @@ class TraceCalls {
 
   /** A call as the screen recording frame choice sees it. */
   recorded(record: CallRecord): RecordedCall {
+    const nextChange = this.nextChange(record);
     return {
       pageId: record.pageId,
       startTime: record.startTime,
@@ -164,9 +177,37 @@ class TraceCalls {
       inputSnapshot: record.inputSnapshot,
       inputTime: this.inputTime(record),
       marks: record.point !== undefined || record.box !== undefined,
-      nextChange: this.nextChange(record),
+      nextChange,
       changedPage: this.pageChanged(record),
+      settledAt: this.settledAt(record, nextChange),
     };
+  }
+
+  /**
+   * When the page, seen still moving after the call ended and before the
+   * next call changed it, was next found still, from the stability checks a
+   * later Action logged as it waited for its element (a smooth scroll moves
+   * it). Unknown when no check saw the page moving then; `Infinity` when no
+   * later check found it still.
+   */
+  private settledAt(
+    record: CallRecord,
+    nextChange: number,
+  ): number | undefined {
+    const end = record.endTime ?? record.startTime;
+    if (end === undefined || record.pageId === undefined) return undefined;
+    const checks = this.stabilityChecks.get(record.pageId) ?? [];
+    const moving = checks
+      .filter(({ still, time }) => !still && time > end && time < nextChange)
+      .map(({ time }) => time);
+    if (moving.length === 0) return undefined;
+    const lastMoving = Math.max(...moving);
+    return Math.min(
+      Infinity,
+      ...checks
+        .filter(({ still, time }) => still && time > lastMoving)
+        .map(({ time }) => time),
+    );
   }
 
   /**
@@ -311,6 +352,7 @@ class TraceCalls {
         ) {
           record.scrollTime = time;
         }
+        this.addStabilityCheck(record, time, event.message);
         break;
       }
       case 'input':
@@ -365,6 +407,29 @@ class TraceCalls {
       record.passwordField = target.isPasswordField;
       record.element = target.recorded(this.selectors.scope(record.selector));
     }
+  }
+
+  /** Keeps a call's log line if it reports a stability check. */
+  private addStabilityCheck(
+    record: CallRecord,
+    time: number | undefined,
+    message: unknown,
+  ): void {
+    if (
+      time === undefined ||
+      record.pageId === undefined ||
+      typeof message !== 'string'
+    ) {
+      return;
+    }
+    const still = STILL_LOG.test(message);
+    if (!still && !MOVING_LOG.test(message)) return;
+    let checks = this.stabilityChecks.get(record.pageId);
+    if (!checks) {
+      checks = [];
+      this.stabilityChecks.set(record.pageId, checks);
+    }
+    checks.push({ time, still });
   }
 
   /** Remembers where a named snapshot sits among its frame's snapshots. */

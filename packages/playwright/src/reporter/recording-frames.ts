@@ -37,6 +37,11 @@ export type RecordedCall = {
   nextChange: number;
   /** Whether the page's DOM snapshots show the call changed it; unknown without them. */
   changedPage?: boolean;
+  /**
+   * When the page, seen still moving after the call ended, was next found
+   * still (`Infinity` if never); unknown if nothing saw it moving then.
+   */
+  settledAt?: number;
 };
 
 /**
@@ -86,19 +91,32 @@ export class RecordingFrames {
    * call's effect can outlast it (a smooth scroll to a focused field runs
    * on after a fill ends, while the DOM snapshots still record the old
    * scroll offsets), and the recording gets a frame only when the page
-   * repaints, so the last frame shows the page as it settled, where an
-   * earlier one may show it still moving. Without such a frame, the last
+   * repaints, so the last frame is the likeliest to show the page as it
+   * settled, where an earlier one may show it still moving. Without such a frame, the last
    * one painted by its end, or the page's first frame; except that an
    * Action that sent input to an element with no point to mark (a fill) and
    * changed the page gets none, as a frame from before its end may show the
    * page before it scrolled to the field and typed.
+   *
+   * The recording also skips frames while the page moves, so its last frame
+   * may show a smooth scroll still easing in, with the typed field not yet
+   * in view. So when the page was seen still moving after a fill ended, the
+   * fill gets only a frame painted at least PAINT_LAG after the page was
+   * next found still, or none.
    */
   afterAction(call: RecordedCall): ScreencastFrame | undefined {
-    const { pageId, nextChange } = call;
+    const { pageId, nextChange, settledAt } = call;
     const end = call.endTime ?? call.startTime;
     if (end === undefined) return undefined;
-    const after = this.screencast.lastPaintedBetween(pageId, end, nextChange);
     const typed = call.inputSnapshot !== undefined && !call.marks;
+    if (typed && settledAt !== undefined) {
+      return this.screencast.lastPaintedBetween(
+        pageId,
+        Math.max(end, settledAt + PAINT_LAG),
+        nextChange,
+      );
+    }
+    const after = this.screencast.lastPaintedBetween(pageId, end, nextChange);
     if (after || (typed && call.changedPage)) return after;
     return (
       this.screencast.lastPaintedBy(pageId, end) ??

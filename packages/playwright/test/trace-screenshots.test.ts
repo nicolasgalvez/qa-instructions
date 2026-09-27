@@ -509,24 +509,12 @@ const V8_SMOOTH = {
   FILL: ActionRef.of(6, `Fill "3" getByLabel('Quantity')`),
 };
 
-test('trace format 8: a fill whose smooth scroll outlasts it gets the frame showing the scroll settled', async () => {
+test('trace format 8: a fill whose smooth scroll outlasts it gets no frame painted before the page was found still', async () => {
+  // The click logged the page still moving until 515ms before it found it
+  // still, and the recording painted no frame from then until the click
+  // scrolled: the last frame before that may show the scroll easing in.
   const source = await TraceScreenshotSource.open(fixture('v8-smooth.zip'));
-  const fill = source.capture(V8_SMOOTH.FILL);
-  assert.deepEqual(moments(fill), ['after']);
-  // Frames painted soon after the fill still show the page scrolling from
-  // the top (all green); the last one before the click scrolls shows the
-  // band, with the typed field at the bottom edge.
-  const frame = shot(fill, 'after');
-  assertColor(
-    await jpegPixel(frame, 300, 250),
-    SCROLL_PAGE.yellowBand,
-    'scrolled to the band',
-  );
-  assertColor(
-    await jpegPixel(frame, 200, 296),
-    SCROLL_PAGE.typedField,
-    'the typed field',
-  );
+  assert.deepEqual(moments(source.capture(V8_SMOOTH.FILL)), []);
 });
 
 test('trace format 8: a fill with no frame painted after it gets no screenshot, never one from before its scroll', async () => {
@@ -551,6 +539,27 @@ test('trace format 8: a fill with no frame painted after it gets no screenshot, 
   );
   const source = await openEntries(entries);
   assert.deepEqual(moments(source.capture(V8_SMOOTH.FILL)), []);
+});
+
+/**
+ * The gift-card page's trace from a CI run on Playwright 1.56 (the
+ * derived-steps `/gift-cards` test, viewport 800×600), kept as recorded: the
+ * fill's focus starts a smooth scroll of about 640ms. The recording painted
+ * its last frame before the click scrolled while the page was still easing
+ * in, with the form in view but the typed field just below the fold. The
+ * click's log saw the page moving 174ms before that frame and first found it
+ * still 342ms after it, so no frame is known to show the scroll settled.
+ */
+const V8_SMOOTH_UNSETTLED_FILL = ActionRef.of(
+  5,
+  `Fill "3" getByLabel('Gift card quantity')`,
+);
+
+test('trace format 8: a fill whose smooth scroll is not known to have settled by any frame gets no screenshot', async () => {
+  const source = await TraceScreenshotSource.open(
+    fixture('v8-smooth-unsettled.zip'),
+  );
+  assert.deepEqual(moments(source.capture(V8_SMOOTH_UNSETTLED_FILL)), []);
 });
 
 test('trace format 8: a check Playwright skipped (already checked) gets no screenshot', async () => {
