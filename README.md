@@ -1,34 +1,14 @@
 # qa-instructions
 
-Collect browser test steps agnostically, render human-repeatable QA instructions separately.
+Turns what your existing Playwright tests already do into QA Instructions: steps a person can follow by hand to check the same thing. Tests are not changed.
 
-## Architecture
+## Setup
 
-```
-Test adapter (Playwright)  →  QaRunBundle (JSON + assets)  →  Renderers (qa-steps, json, …)
-         capture only                  canonical data                 pure transforms
-```
-
-- **Capture** knows nothing about Jira or Markdown
-- **Render** knows nothing about Playwright
-- Adding an output format = one function in `@qa-instructions/core/render`
-- Adding a test runner = one adapter that produces `QaRunBundle`
-
-See [docs/design.md](./docs/design.md) for the full spec.
-
-## Packages
-
-| Package                       | Role                                                                             |
-| ----------------------------- | -------------------------------------------------------------------------------- |
-| `@qa-instructions/core`       | Runner-independent core: test event port, QA Steps, bundle model, I/O, renderers |
-| `@qa-instructions/playwright` | Reporter adapter (plus the legacy `qa` fixture + collector)                      |
-| `@qa-instructions/cli`        | `qa-instructions render` command                                                 |
-
-## Usage: derive QA Steps from existing tests
-
-Add the reporter to `playwright.config.ts`. Tests are not changed.
+Add the reporter to `playwright.config.ts`:
 
 ```typescript
+import { defineConfig } from '@playwright/test';
+
 export default defineConfig({
   reporter: [
     ['list'],
@@ -37,55 +17,53 @@ export default defineConfig({
 });
 ```
 
-Each test's browser Actions (opening a URL, clicking, typing, pressing keys, choosing options) become numbered QA Steps, and the `expect` checks that follow an Action become its Expected Result. Waits, scripts, value reads, and API requests are left out. `@playwright/test` is a peer dependency used for types only, so the package always runs against your project's own Playwright.
+That is the whole setup. Run your tests as usual (`npx playwright test`); the reporter writes one QA Instructions bundle per test to `qa-runs/`.
 
-Render as in step 3 below. See `examples/derived-steps` for a full example.
+`@playwright/test` is a peer dependency used for types only, so the package always runs against your project's own Playwright and never loads a second copy.
 
-## Legacy usage: the `qa` fixture
+Step Screenshots are not produced yet. When they are, they will come from Playwright's trace and need one `trace` setting in the same config.
 
-### 1. Write a test
+## What you get
 
-```typescript
-import { test, expect } from '@qa-instructions/playwright';
+Each test's browser Actions (opening a URL, clicking, typing, pressing keys, choosing options) become numbered QA Steps, and the `expect` checks that follow an Action become its Expected Result. Waits, scripts, value reads, and API requests are left out because a tester cannot repeat them.
 
-test('Create a project', async ({ qa, page }) => {
-  qa.guide({
-    title: 'Create a project',
-    prerequisite: 'Deploy branch to dev first.',
-  });
-
-  await qa.step(
-    'Open https://app.example.com/projects',
-    'Project list loads with no error',
-    async () => {
-      await page.goto('https://app.example.com/projects');
-      await expect(
-        page.getByRole('heading', { name: 'Projects' }),
-      ).toBeVisible();
-    },
-  );
-});
+```
+1. Open http://127.0.0.1:4321/ — The **Fixture App** heading is visible
+2. Click the **Sign in** link — The page title is **Sign in**; **Username** is empty
+3. Type **demo-user** into **Username**
+4. Click the **Submit bad credentials** button — **Invalid credentials** is visible; the **Login failed** heading is visible
+5. Press **Tab**
 ```
 
-### 2. Collect bundles (Playwright config)
+## Render
 
-```typescript
-export default defineConfig({
-  reporter: [
-    ['list'],
-    ['html'],
-    ['@qa-instructions/playwright/collector', { outputDir: 'qa-runs' }],
-  ],
-});
-```
-
-### 3. Render output (separate step)
+Rendering is a separate step, so you can re-render without re-running tests:
 
 ```bash
 qa-instructions render qa-runs/ --format qa-steps --out qa-steps-out/
 ```
 
-Paste `qa-steps-out/*.txt` into your ticket. Screenshots stay in `qa-runs/` and the Playwright HTML report.
+Paste `qa-steps-out/*.txt` into your ticket's QA Steps.
+
+## Architecture
+
+```
+Playwright reporter (adapter)  →  core (test events → QA Instructions)  →  bundle (JSON + assets)  →  renderers
+```
+
+- The core is runner-independent: it accepts a neutral stream of test events and knows nothing about Playwright or Jest.
+- The Playwright reporter is a thin adapter that translates reporter steps into those events.
+- Renderers are pure functions from bundle to text; adding an output format touches only the renderer.
+
+See [docs/design.md](./docs/design.md) and [ADR 0001](./docs/adr/0001-reporter-derived-qa-steps.md). Vocabulary is in [CONTEXT.md](./CONTEXT.md).
+
+## Packages
+
+| Package                       | Role                                                                             |
+| ----------------------------- | -------------------------------------------------------------------------------- |
+| `@qa-instructions/core`       | Runner-independent core: test event port, QA Steps, bundle model, I/O, renderers |
+| `@qa-instructions/playwright` | Playwright reporter adapter (`@qa-instructions/playwright/reporter`)             |
+| `@qa-instructions/cli`        | `qa-instructions render` command                                                 |
 
 ## CI
 
@@ -99,11 +77,13 @@ Unit CI runs `packages/*` tests only; Playwright browser tests stay in the E2E w
 
 ## Examples
 
-| Example                  | Purpose                                                        |
-| ------------------------ | -------------------------------------------------------------- |
-| `examples/verification`  | Deterministic capture/render e2e with golden screenshot probes |
-| `examples/derived-steps` | Unmodified test + reporter → rendered QA Steps, golden text    |
-| `examples/basic`         | Optional smoke against playwright.dev                          |
+All examples are unmodified Playwright tests with the reporter added to their config.
+
+| Example                  | Purpose                                                          |
+| ------------------------ | ---------------------------------------------------------------- |
+| `examples/verification`  | Deterministic e2e: golden bundle and QA Steps for a test-id flow |
+| `examples/derived-steps` | Role/label locators, helper functions, and dropped test plumbing |
+| `examples/basic`         | Optional smoke against playwright.dev                            |
 
 ```bash
 # Full pipeline verification (recommended)

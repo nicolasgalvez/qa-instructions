@@ -4,17 +4,9 @@
 
 ## Playwright Test (implemented)
 
-### Capture — worker process
+qa-instructions runs only in the main process, as a reporter. Nothing runs in the worker and tests are not changed (see [ADR 0001](./adr/0001-reporter-derived-qa-steps.md)).
 
-| API                                        | Purpose                                 |
-| ------------------------------------------ | --------------------------------------- |
-| `test.extend({ qa })`                      | Fixture: setup → `use()` → teardown     |
-| `test.step(title, fn)`                     | Step tree; `fn` receives `TestStepInfo` |
-| `step.attach(name, { body, contentType })` | Per-step artifacts (requires ≥1.51)     |
-| `testInfo.attach(name, { body })`          | Test-level artifacts (bundle JSON)      |
-| `page.screenshot()`                        | Capture primitive                       |
-
-### Collection — main process (`Reporter`)
+### Capture — main process (`Reporter`)
 
 ```typescript
 interface Reporter {
@@ -22,20 +14,17 @@ interface Reporter {
   onTestBegin?(test: TestCase, result: TestResult): void;
   onStepBegin?(test: TestCase, result: TestResult, step: TestStep): void;
   onStepEnd?(test: TestCase, result: TestResult, step: TestStep): void;
-  onTestEnd?(test: TestCase, result: TestResult): void; // ← collector hook
+  onTestEnd?(test: TestCase, result: TestResult): void; // ← QaInstructionsReporter hook
   onEnd?(result: FullResult): Promise<void>; // awaited
   onExit?(): Promise<void>; // awaited
 }
 ```
 
-**`TestResult` fields used by collector:**
+**`TestResult` fields used by the reporter:**
 
-- `attachments[]` — `{ name, contentType, body?, path? }`; use last `qa-run-bundle` on retry
-- `steps[]` — tree; filter `step.category === 'test.step'`; read `step.attachments`
+- `steps[]` — tree; `pw:api` steps become Actions, `expect` steps become checks; `fixture` and `hook` steps are dropped
 
 **Step categories:** `test.step`, `pw:api`, `expect`, `fixture`, `hook`, `test.attach`
-
-**Built-in reporters to keep enabled:** `html` (step attachment previews), `list`
 
 Docs: https://playwright.dev/docs/test-reporters , https://playwright.dev/docs/api/class-teststepinfo
 
@@ -58,7 +47,7 @@ class CustomEnvironment extends NodeEnvironment {
 
 **jest-playwright pattern:** extend `PlaywrightEnvironment`, screenshot on `test_done` + errors.
 
-**Gap:** No native step tree or attach API. Requires explicit `qa.step()` wrapper; screenshots via environment, not attachments.
+**Gap:** No native step tree or attach API. The adapter must map circus events (and page calls) to core test events itself; screenshots via environment, not attachments.
 
 ### Collection — `Reporter` (main process)
 

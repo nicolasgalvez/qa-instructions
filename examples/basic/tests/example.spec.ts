@@ -1,24 +1,12 @@
-import { test, expect } from '@qa-instructions/playwright';
+import { test, expect } from '@playwright/test';
 
-test('Browse Playwright docs', async ({ qa, page }) => {
-  qa.guide({
-    title: 'Browse Playwright docs',
-    prerequisite: 'None.',
-  });
+// An ordinary Playwright test: nothing here knows about qa-instructions.
+// The reporter in playwright.config.ts derives the QA Steps.
 
-  await qa.step(
-    'Open https://playwright.dev',
-    'Homepage loads with Get started link visible',
-    async () => {
-      await page.goto('https://playwright.dev');
-      await expect(
-        page.getByRole('link', { name: 'Get started' }),
-      ).toBeVisible();
-    },
-  );
+test('Browse Playwright docs', async ({ page }) => {
+  await page.goto('https://playwright.dev');
+  await expect(page.getByRole('link', { name: 'Get started' })).toBeVisible();
 
-  await qa.step('Click `Get started`', 'Lands on intro docs page', async () => {
-    await page.getByRole('link', { name: 'Get started' }).click();
-    await expect(page).toHaveURL(/.*intro/);
-  });
+  await page.getByRole('link', { name: 'Get started' }).click();
+  await expect(page).toHaveURL(/.*intro/);
 });

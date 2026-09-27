@@ -13,7 +13,6 @@
     "@qa-instructions/cli": "workspace:*",
     "@qa-instructions/fixture-site": "workspace:*",
     "@qa-instructions/playwright": "workspace:*",
-    "@playwright/test": "^1.63.0",
-    "pngjs": "^7.0.0"
+    "@playwright/test": "^1.63.0"
   }
 }
