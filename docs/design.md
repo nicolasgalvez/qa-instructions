@@ -162,6 +162,7 @@ packages/
 examples/
   verification/         # golden e2e against the fixture site
   derived-steps/        # golden e2e: helpers, plumbing, role/label locators
+  derived-steps-1.56/   # the derived-steps tests pinned to Playwright 1.56
   basic/                # smoke against playwright.dev
   fixture-site/         # local Astro site the e2e examples run against
 ```

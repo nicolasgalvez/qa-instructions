@@ -4,8 +4,12 @@ dist-test/
 .astro/
 qa-runs/
 qa-runs-selection/
+qa-runs-no-trace/
 qa-steps-out/
 playwright-report/
 test-results/
 .claude/settings.local.json
 .playwright-mcp/
+# Copies made by examples/derived-steps-1.56/scripts (see shared.mjs).
+examples/derived-steps-1.56/tests/
+examples/derived-steps-1.56/trace-scenario/

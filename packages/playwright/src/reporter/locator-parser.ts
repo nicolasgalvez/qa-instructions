@@ -13,15 +13,23 @@ const BY_METHOD: Record<string, Exclude<ElementTarget['by'], 'role'>> = {
 };
 
 /**
+ * The object a locator chain starts from when read from test source, e.g.
+ * `page.` or `this.page.` in `page.getByRole('link')`. Locator descriptions
+ * Playwright reports have none.
+ */
+const RECEIVER = /^(?:[A-Za-z_$][\w$]*\s*\??\.\s*)+(?=[A-Za-z_$][\w$]*\s*\()/;
+
+/**
  * Reads a Playwright locator description such as
- * `locator('form').getByRole('button', { name: 'Save' }).first()` and returns
- * the element it ends on as a neutral ElementTarget.
+ * `locator('form').getByRole('button', { name: 'Save' }).first()`, or the
+ * same chain as written in a test (`page.getByRole(...)`), and returns the
+ * element it ends on as a neutral ElementTarget.
  */
 export class LocatorParser {
   parse(locator: string | undefined): ElementTarget | undefined {
     if (!locator) return undefined;
 
-    const calls = this.splitCalls(locator);
+    const calls = this.splitCalls(locator.replace(RECEIVER, ''));
     for (let i = calls.length - 1; i >= 0; i -= 1) {
       const target = this.toTarget(calls[i]);
       if (target) return target;

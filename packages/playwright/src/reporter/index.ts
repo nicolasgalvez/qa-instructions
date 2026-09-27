@@ -1,6 +1,11 @@
 import path from 'node:path';
 
-import type { Reporter, TestCase, TestResult } from '@playwright/test/reporter';
+import type {
+  FullConfig,
+  Reporter,
+  TestCase,
+  TestResult,
+} from '@playwright/test/reporter';
 import {
   HighlightPlanner,
   QaInstructionsRecorder,
@@ -17,8 +22,10 @@ import {
 } from '@qa-instructions/core';
 
 import { AttemptTraces } from './attempt-traces.js';
+import { ReporterLog } from './reporter-log.js';
 import { SharpScreenshotAnnotator } from './sharp-screenshot-annotator.js';
 import { PlaywrightStepTranslator } from './step-translator.js';
+import { TraceAdvice } from './trace-advice.js';
 
 export type QaInstructionsReporterOptions = {
   /** Where QA Instructions bundles are written. Default `qa-runs`. */
@@ -52,10 +59,15 @@ export type QaInstructionsReporterOptions = {
  * Playwright reporter that derives QA Instructions from what each test
  * already does. Add it to `reporter` in playwright.config; tests are not
  * changed. Imports Playwright for types only.
+ *
+ * Nothing it does can fail the test run: every hook catches its own errors
+ * and reports them once on stderr, along with any setup advice (such as the
+ * trace setting Step Screenshots need).
  */
 export default class QaInstructionsReporter implements Reporter {
   private readonly outputDir: string;
   private readonly selection: TestSelection;
+  private advice = new TraceAdvice();
 
   constructor(
     options: QaInstructionsReporterOptions = {},
@@ -72,13 +84,23 @@ export default class QaInstructionsReporter implements Reporter {
       new HighlightPlanner(options.highlight),
       (step, error) => this.warnHighlight(step.action, error),
     ),
+    private readonly log = new ReporterLog(),
   ) {
     this.outputDir = options.outputDir ?? 'qa-runs';
-    this.selection = new TestSelection(options.select);
+    this.selection = this.selectionOf(options.select);
   }
 
   printsToStdio(): boolean {
     return false;
+  }
+
+  /** Learns the project's Playwright version, for version-specific advice. */
+  onBegin(config: FullConfig): void {
+    try {
+      this.advice = new TraceAdvice(config?.version);
+    } catch (error) {
+      this.log.error('this run', error);
+    }
   }
 
   /** Called once per attempt; the run keeps each test's last attempt. */
@@ -91,7 +113,7 @@ export default class QaInstructionsReporter implements Reporter {
       }
       this.traces.add(test.id, result.retry + 1, result.attachments);
     } catch (error) {
-      this.warn(test.title, error);
+      this.log.error(test?.title, error);
     }
   }
 
@@ -104,26 +126,33 @@ export default class QaInstructionsReporter implements Reporter {
     try {
       results = this.run.results();
     } catch (error) {
-      this.warn('this run', error);
+      this.log.error('this run', error);
     }
     for (const result of results) {
       try {
-        const screenshots = await this.traces.screenshots(
-          result.start.id,
-          result.start.attempt,
-        );
-        const { bundle, assets } = await this.highlighter.highlight(
-          result.record(screenshots),
-        );
-        await writeBundle(
-          path.join(this.outputDir, result.dirName),
-          bundle,
-          assets,
-        );
+        await this.write(result);
       } catch (error) {
-        this.warn(result.bundle.meta.title, error);
+        this.log.error(result.bundle.meta.title, error);
       }
     }
+  }
+
+  private async write(result: QaInstructionsResult): Promise<void> {
+    const { source, problem } = await this.traces.screenshots(
+      result.start.id,
+      result.start.attempt,
+    );
+    if (problem) {
+      this.log.once(this.advice.key(problem), this.advice.message(problem));
+    }
+    const { bundle, assets } = await this.highlighter.highlight(
+      result.record(source),
+    );
+    await writeBundle(
+      path.join(this.outputDir, result.dirName),
+      bundle,
+      assets,
+    );
   }
 
   private warnHighlight(step: string, error: unknown): void {
@@ -132,9 +161,16 @@ export default class QaInstructionsReporter implements Reporter {
     );
   }
 
-  private warn(subject: string, error: unknown): void {
-    console.warn(
-      `qa-instructions: could not write QA Instructions for "${subject}": ${String(error)}`,
-    );
+  /** An unusable `select` option is ignored, with a warning, rather than stopping the run. */
+  private selectionOf(select: TestSelectionOptions | undefined): TestSelection {
+    try {
+      return new TestSelection(select);
+    } catch (error) {
+      this.log.once(
+        'select',
+        `ignoring the "select" option (${String(error)}); every test produces QA Instructions.`,
+      );
+      return new TestSelection();
+    }
   }
 }

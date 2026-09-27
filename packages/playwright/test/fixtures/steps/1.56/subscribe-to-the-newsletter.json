@@ -1,0 +1,78 @@
+{
+  "title": "Subscribe to the newsletter",
+  "steps": [
+    {
+      "title": "Before Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create context",
+              "category": "pw:api"
+            }
+          ]
+        },
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create page",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Navigate to \"/newsletter\"",
+      "category": "pw:api",
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 34,
+        "column": 14
+      }
+    },
+    {
+      "title": "Click getByRole('button', { name: 'Subscribe' })",
+      "category": "pw:api",
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 35,
+        "column": 57
+      }
+    },
+    {
+      "title": "Expect \"toBeVisible\"",
+      "category": "expect",
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 36,
+        "column": 58
+      }
+    },
+    {
+      "title": "After Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture"
+        },
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Close context",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

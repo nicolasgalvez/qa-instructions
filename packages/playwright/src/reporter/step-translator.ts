@@ -1,83 +1,44 @@
 import type { TestCase, TestResult, TestStep } from '@playwright/test/reporter';
 import type {
   ActionEvent,
-  ActionKind,
   CheckEvent,
   TestEvent,
   TestStartEvent,
 } from '@qa-instructions/core';
 
 import { ActionRefSequence } from './action-ref.js';
-import { CallSiteReader } from './call-site-reader.js';
+import { ACTION_KINDS } from './action-verbs.js';
+import { CallSiteReader, type CheckSite } from './call-site-reader.js';
 import { LocatorParser } from './locator-parser.js';
-
-/** Playwright `pw:api` step titles (the part before any quoted value) → neutral kinds. */
-const ACTION_KINDS: Record<string, ActionKind> = {
-  Navigate: 'navigate',
-  Click: 'click',
-  'Double click': 'doubleClick',
-  Tap: 'tap',
-  Hover: 'hover',
-  Fill: 'fill',
-  Type: 'type',
-  Insert: 'type',
-  Press: 'press',
-  Check: 'check',
-  Uncheck: 'uncheck',
-  'Select option': 'select',
-  'Set input files': 'upload',
-  'Go back': 'goBack',
-  'Go forward': 'goForward',
-  Reload: 'reload',
-  'Wait for timeout': 'wait',
-  'Wait for selector': 'wait',
-  'Wait for function': 'wait',
-  'Wait for state': 'wait',
-  'Wait for event': 'wait',
-  'Wait for navigation': 'wait',
-  'Wait for load state': 'wait',
-  'Wait for URL': 'wait',
-  Evaluate: 'script',
-  'Add init script': 'script',
-  'Add script tag': 'script',
-  'Dispatch event': 'dispatch',
-  Dispatch: 'dispatch',
-  'Get text content': 'read',
-  'Get inner text': 'read',
-  'Get input value': 'read',
-  'Get attribute': 'read',
-  'Get HTML': 'read',
-  'Get content': 'read',
-  'Get page title': 'read',
-  GET: 'request',
-  POST: 'request',
-  PUT: 'request',
-  PATCH: 'request',
-  DELETE: 'request',
-  HEAD: 'request',
-  'Launch browser': 'setup',
-  'Create context': 'setup',
-  'Create page': 'setup',
-  'Close context': 'setup',
-  'Close page': 'setup',
-  'Close browser': 'setup',
-};
+import { StepTitleParser } from './step-title.js';
 
 /** Matchers whose subject is the page rather than an element. */
 const PAGE_MATCHERS = new Set(['toHaveURL', 'toHaveTitle']);
 
-const EXPECT_TITLE = /^Expect "(not )?([A-Za-z]+)"$/;
+/**
+ * A check's title: `Expect "not toBeHidden"`. Playwright 1.53–1.54 write the
+ * matcher alone (`not toBeHidden`); 1.57–1.62 add the locator after it
+ * (`Expect "toBeVisible" getByText('Saved')`).
+ */
+const EXPECT_TITLE =
+  /^(?:Expect "(?<not>not )?(?<matcher>[A-Za-z]+)"(?: (?<locator>.+))?|(?<bareNot>not )?(?<bareMatcher>to[A-Z][A-Za-z]*))$/;
 
 /**
  * Playwright adapter for the core's inbound port: translates one test's
- * reporter steps (Playwright 1.63 title, subtitle, params, category) into the
- * neutral test event stream. What the step data leaves out (whether a call
- * was forced, whether its result was used) is read from the call site.
+ * reporter steps into the neutral test event stream.
+ *
+ * Playwright 1.63+ reports each step's details as `subtitle` and `params`.
+ * Earlier releases (1.53–1.62) report neither: a browser call's verb, value,
+ * and locator are read from its title, and a check's subject and expected
+ * value from the test's source at the check. What no version's step data
+ * says (whether a call was forced, whether its result was used) is read from
+ * the call site.
  */
 export class PlaywrightStepTranslator {
   constructor(
     private readonly locators = new LocatorParser(),
     private readonly callSites = new CallSiteReader(),
+    private readonly titles = new StepTitleParser(),
   ) {}
 
   translate(test: TestCase, result: TestResult): TestEvent[] {
@@ -165,21 +126,24 @@ export class PlaywrightStepTranslator {
 
   private action(step: TestStep, ref: string): ActionEvent {
     const params = this.params(step);
-    const verb = step.title.split(' "')[0];
+    const title = this.titles.parse(step.title);
+    const navigate = title.verb === 'Navigate';
     const callSite = step.location
       ? this.callSites.read(step.location)
       : undefined;
     const forced = params.force === true || callSite?.forced === true;
     return {
       type: 'action',
-      kind: ACTION_KINDS[verb] ?? 'other',
-      target: this.locators.parse(this.locator(step)),
-      value: this.text(
-        params.value ?? params.text ?? params.key ?? params.type,
-      ),
+      kind: ACTION_KINDS[title.verb] ?? 'other',
+      target: this.locators.parse(this.locator(step) ?? title.locator),
+      value:
+        this.text(params.value ?? params.text ?? params.key ?? params.type) ??
+        (navigate ? undefined : title.value),
       url:
         this.text(params.url) ??
-        (verb === 'Navigate' ? step.subtitle : undefined),
+        (navigate
+          ? (step.subtitle ?? callSite?.literalArgument ?? title.value)
+          : undefined),
       failed: this.failed(step),
       ...(forced ? { forced } : {}),
       ...(callSite ? { resultUsed: callSite.resultUsed } : {}),
@@ -191,8 +155,13 @@ export class PlaywrightStepTranslator {
     const match = EXPECT_TITLE.exec(step.title);
     if (!match) return undefined;
 
-    const [, not, matcher] = match;
-    const target = this.locators.parse(this.locator(step));
+    const groups = match.groups ?? {};
+    const not = groups.not ?? groups.bareNot;
+    const matcher = groups.matcher ?? groups.bareMatcher;
+    const site = this.checkSite(step);
+    const target = this.locators.parse(
+      this.locator(step) ?? groups.locator ?? site?.subject,
+    );
     return {
       type: 'check',
       matcher,
@@ -203,9 +172,16 @@ export class PlaywrightStepTranslator {
           ? 'page'
           : 'value',
       target,
-      expected: this.text(this.params(step).expected),
+      expected: this.text(this.params(step).expected) ?? site?.expected,
       failed: this.failed(step),
     };
+  }
+
+  /** Before 1.63 a check step has no params: its subject and expected value are in the source. */
+  private checkSite(step: TestStep): CheckSite | undefined {
+    return step.params === undefined && step.location
+      ? this.callSites.readCheck(step.location)
+      : undefined;
   }
 
   /** A browser call or check whose own error failed the test. */

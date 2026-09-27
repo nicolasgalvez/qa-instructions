@@ -1,0 +1,90 @@
+{
+  "title": "Subscribe to the newsletter",
+  "steps": [
+    {
+      "title": "Before Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create context",
+              "category": "pw:api"
+            }
+          ]
+        },
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create page",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Navigate",
+      "category": "pw:api",
+      "subtitle": "/newsletter",
+      "params": {
+        "url": "/newsletter"
+      },
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 34,
+        "column": 14
+      }
+    },
+    {
+      "title": "Click",
+      "category": "pw:api",
+      "subtitle": "getByRole('button', { name: 'Subscribe' })",
+      "params": {
+        "locator": "getByRole('button', { name: 'Subscribe' })"
+      },
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 35,
+        "column": 57
+      }
+    },
+    {
+      "title": "Expect \"toBeVisible\"",
+      "category": "expect",
+      "subtitle": "getByText('Thanks for subscribing')",
+      "params": {
+        "locator": "getByText('Thanks for subscribing')"
+      },
+      "location": {
+        "file": "scripted-page.spec.ts",
+        "line": 36,
+        "column": 58
+      }
+    },
+    {
+      "title": "After Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture"
+        },
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Close context",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

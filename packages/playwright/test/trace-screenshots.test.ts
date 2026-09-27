@@ -164,7 +164,21 @@ test('the password field type is read case-insensitively', async () => {
   }
 });
 
-test('a trace in an unknown format version gives no screenshots', async () => {
+/** Writes `entries` as a trace.zip in a temporary directory and opens it. */
+async function openEntries(
+  entries: Record<string, Uint8Array>,
+): Promise<TraceScreenshotSource> {
+  const dir = await mkdtemp(path.join(tmpdir(), 'qa-trace-'));
+  try {
+    const file = path.join(dir, 'trace.zip');
+    await writeFile(file, zipSync(entries));
+    return await TraceScreenshotSource.open(file);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+test('a trace in an unknown format version gives no screenshots and says why', async () => {
   // The v9 sample, relabeled as a future format.
   const entries = unzipSync(await readFile(TRACES[9]));
   for (const [name, data] of Object.entries(entries)) {
@@ -173,20 +187,23 @@ test('a trace in an unknown format version gives no screenshots', async () => {
       strFromU8(data).replaceAll('"version":9,', '"version":11,'),
     );
   }
-  const dir = await mkdtemp(path.join(tmpdir(), 'qa-trace-'));
-  try {
-    const future = path.join(dir, 'trace.zip');
-    await writeFile(future, zipSync(entries));
-    const source = await TraceScreenshotSource.open(future);
-    assert.equal(source.capture(CLICK), undefined);
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+  const source = await openEntries(entries);
+  assert.equal(source.capture(CLICK), undefined);
+  assert.deepEqual(source.problem, {
+    kind: 'unsupportedVersion',
+    version: 11,
+  });
+});
+
+test('a readable trace in a supported version has no problem', async () => {
+  const source = await TraceScreenshotSource.open(TRACES[9]);
+  assert.equal(source.problem, undefined);
 });
 
 test('a missing or unreadable trace gives no screenshots and does not throw', async () => {
   const missing = await TraceScreenshotSource.open('/nonexistent/trace.zip');
   assert.equal(missing.capture(CLICK), undefined);
+  assert.equal(missing.problem?.kind, 'unreadable');
 
   const notAZip = await TraceScreenshotSource.open(
     fileURLToPath(
@@ -194,4 +211,108 @@ test('a missing or unreadable trace gives no screenshots and does not throw', as
     ),
   );
   assert.equal(notAZip.capture(CLICK), undefined);
+  assert.equal(notAZip.problem?.kind, 'unreadable');
+});
+
+// Trace format 8, recorded from the same scenario with Playwright 1.56
+// (`trace: 'on'`). Before 1.63 there are no per-action screenshots, only the
+// page's screen recording; step titles carry the locator.
+const V8 = {
+  NAVIGATE: ActionRef.of(4, 'Navigate to "data:"'),
+  FILL: ActionRef.of(5, `Fill "Ada" getByLabel('Name')`),
+  CLICK: ActionRef.of(6, `Click getByRole('button', { name: 'Paint' })`),
+  PRESS: ActionRef.of(7, 'Press "Tab"'),
+};
+
+/** The screen recording's frames in the v8 sample, in the order recorded. */
+async function v8Frames(): Promise<Buffer[]> {
+  const entries = unzipSync(await readFile(fixture('v8.zip')));
+  return Object.keys(entries)
+    .filter((name) => name.startsWith('resources/') && name.endsWith('.jpeg'))
+    .sort()
+    .map((name) => Buffer.from(entries[name]));
+}
+
+test('trace format 8: each Action gets the screen recording frame nearest its end', async () => {
+  const source = await TraceScreenshotSource.open(fixture('v8.zip'));
+  assert.equal(source.problem, undefined);
+  const frames = await v8Frames();
+  assert.equal(frames.length, 4);
+
+  for (const [ref, frame] of [
+    // Navigation ends before the first frame is painted: the next frame.
+    [V8.NAVIGATE, 0],
+    // Otherwise the last frame painted by the time the Action ended.
+    [V8.FILL, 2],
+    [V8.CLICK, 3],
+    [V8.PRESS, 3],
+  ] as const) {
+    const screenshots = source.capture(ref)?.screenshots ?? [];
+    assert.equal(screenshots.length, 1, ref);
+    assert.equal(screenshots[0].moment, 'after', ref);
+    assert.equal(screenshots[0].contentType, 'image/jpeg', ref);
+    assert.ok(
+      screenshots[0].data.equals(frames[frame]),
+      `${ref}: frame ${frame}`,
+    );
+  }
+});
+
+test('trace format 8 as Playwright 1.53–1.54 write it (every step method "step") gives the same captures', async () => {
+  const entries = unzipSync(await readFile(fixture('v8.zip')));
+  entries['test.trace'] = strToU8(
+    strFromU8(entries['test.trace']).replace(
+      /"method":"[^"]+"/g,
+      '"method":"step"',
+    ),
+  );
+  const source = await openEntries(entries);
+  const frames = await v8Frames();
+  assert.ok(source.capture(V8.FILL)?.screenshots[0].data.equals(frames[2]));
+  assert.deepEqual(source.capture(V8.CLICK)?.point, { x: 100, y: 60 });
+});
+
+test('trace format 8: the click point comes from the trace, with no element box', async () => {
+  const source = await TraceScreenshotSource.open(fixture('v8.zip'));
+  assert.deepEqual(source.capture(V8.CLICK)?.point, { x: 100, y: 60 });
+  assert.equal(source.capture(V8.CLICK)?.box, undefined);
+});
+
+test('a later trace without per-action screenshots falls back to the screen recording', async () => {
+  // The v9 sample with its per-action screenshots replaced by one recorded
+  // frame, as `trace: 'on'` without `snapshots.screen` writes it.
+  const entries = unzipSync(await readFile(TRACES[9]));
+  const shots = Object.keys(entries).filter((n) =>
+    n.startsWith('screenshots/'),
+  );
+  const frame = entries[shots[0]];
+  for (const name of shots) delete entries[name];
+
+  const library = Object.keys(entries).find(
+    (name) => name.endsWith('.trace') && name !== 'test.trace',
+  ) as string;
+  const lines = strFromU8(entries[library])
+    .split('\n')
+    .filter((line) => !line.includes('"type":"screenshot"'));
+  const pageId = /"pageId":"([^"]+)"/.exec(lines.join('\n'))?.[1];
+  entries['screencast/frame-1.jpeg'] = frame;
+  lines.splice(
+    1,
+    0,
+    JSON.stringify({
+      type: 'screencast-frame',
+      pageId,
+      file: 'screencast/frame-1.jpeg',
+      width: 400,
+      height: 300,
+      timestamp: 0,
+    }),
+  );
+  entries[library] = strToU8(lines.join('\n'));
+
+  const source = await openEntries(entries);
+  const click = source.capture(CLICK);
+  assert.deepEqual(moments(click), ['after']);
+  assert.ok(click?.screenshots[0].data.equals(Buffer.from(frame)));
+  assert.deepEqual(click?.box, { x: 40, y: 40, width: 120, height: 40 });
 });

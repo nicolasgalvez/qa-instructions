@@ -23,6 +23,8 @@ The screenshot adapter reads `trace.zip` itself, unzipping with `fflate`. `playw
 
 The join is: reporter `pw:api` step → the test runner's `test.trace` `before` event → the library call → its screenshots and input. Reporter steps have no id, so a step is matched by its position among the test's `pw:api` steps plus its title. Steps with a `group` (getters, configuration fixtures) are traced but never reported, so they are not counted. In version 9, library `before` events link to the step through `stepId`. In version 10 (verified with `1.64.0-alpha-2026-09-26`), the step id is itself the library `callId`, and screenshot files are named after it. The committed sample traces in `packages/playwright/test/fixtures/traces/` cover both. Any other version gives no screenshots.
 
+Playwright 1.53–1.62 write version 8, linked like version 9 but with no per-action screenshots; 1.53–1.54 also write every test-runner step's `method` as `step`, so a `pw:api` step is known by its call id. Without per-action screenshots (version 8, or a later trace without `snapshots.screen`), a call's Step Screenshot is the screen recording's `screencast-frame` last painted by the call's `after` time (the first frame if none was yet), on the call's page, with moment `after` (so it gets no Highlight); frames are `resources/<sha1>` in version 8 and `screencast/<name>` from version 9. Version 8 `input` events carry the click point but no element box.
+
 ## Masking secrets
 
 Whether an Action typed into a password field is read from the page as the trace recorded it, not from the test code (a locator like `getByLabel('PIN')` says nothing about the field's type). With `snapshots: { dom: true }`, every library call's `frame-snapshot` events (keyed by `callId` and phase) serialize the DOM with the element the call touched marked by a `__playwright_target__` attribute, alongside its own attributes such as `type`. The trace adapter reports, per Action, whether that element is an `input` of type `password` as a neutral `passwordField` fact on the Action's capture; without DOM snapshots the fact is unknown and only configured patterns apply. Nothing fails either way.
@@ -37,6 +39,14 @@ The core decides what a Highlight marks and where (`HighlightPlanner`); a screen
 - **Drawn after the run, replacing the original.** Highlighting happens as each bundle is written; the highlighted image replaces the original, and the bundle's asset records its marks. Keeping both would double every bundle for a view only `highlight: 'none'` needs.
 - **Only on screenshots that match the box.** The box is read at the moment of the Action. Action-moment and before-moment screenshots are highlighted; after-moment ones are not, since the page may have navigated or closed a menu.
 - **Warning steps get none; approximate steps get a dashed outline.** A forced Action's element may have moved while it was clicked, so the outline is drawn where the element was, dashed to say so, and the step's text says the highlight may not line up.
+
+## Older Playwright step data
+
+Before 1.63, reporter steps have no `subtitle` or `params`. The title carries them instead (`Fill "demo-user" getByLabel('Username')`, `Navigate to "/"`), so a step without `params` is read from its title. A check's title names only the matcher (1.57–1.62 add its locator), so its subject and expected value are read from the test's source at the check, like the script and force facts above: `expect(<subject>)[.not].<matcher>(<literal>)`. An expected value written as a literal, or as a constant declared once in the file with a literal, is read; other expressions, and checks whose subject is a variable, are not resolved. 1.52 and earlier title steps by API name (`locator.click`) and write trace version 7; they are not supported, so the peer dependency floor is 1.53. The adapter tests run recorded 1.56 and 1.63 reporter steps (`test/fixtures/steps/`) and a 1.56 sample trace (`v8.zip`); `examples/derived-steps-1.56` runs the derived-steps tests pinned to 1.56 against the 1.63 goldens.
+
+## Setup mistakes
+
+A missing trace (no `trace` attachment), an unsupported trace version, or an unreadable trace gives text-only QA Instructions and one warning per run on stderr; the missing-trace warning names the config line for the project's Playwright version (`FullConfig.version`). Every reporter hook catches its own errors and logs the first one, so the reporter never fails the test run.
 
 ## Considered Options
 

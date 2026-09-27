@@ -10,7 +10,7 @@
     "prepare": "husky",
     "example": "pnpm --filter @qa-instructions/example-basic test",
     "example:render": "pnpm --filter @qa-instructions/example-basic render",
-    "verify": "pnpm --filter @qa-instructions/example-verification e2e && pnpm --filter @qa-instructions/example-derived-steps e2e"
+    "verify": "pnpm --filter @qa-instructions/example-verification e2e && pnpm --filter @qa-instructions/example-derived-steps e2e && pnpm --filter @qa-instructions/example-derived-steps-1.56 e2e"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [

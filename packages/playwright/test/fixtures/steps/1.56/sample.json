@@ -1,0 +1,126 @@
+{
+  "title": "sample",
+  "steps": [
+    {
+      "title": "Before Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"browser\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Launch browser",
+              "category": "pw:api"
+            }
+          ]
+        },
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create context",
+              "category": "pw:api"
+            }
+          ]
+        },
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create page",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Navigate to \"data:\"",
+      "category": "pw:api",
+      "location": {
+        "file": "scenario.spec.ts",
+        "line": 24,
+        "column": 14
+      }
+    },
+    {
+      "title": "Expect \"toBeVisible\"",
+      "category": "expect",
+      "location": {
+        "file": "scenario.spec.ts",
+        "line": 25,
+        "column": 61
+      }
+    },
+    {
+      "title": "fill in the form",
+      "category": "test.step",
+      "location": {
+        "file": "scenario.spec.ts",
+        "line": 26,
+        "column": 14
+      },
+      "steps": [
+        {
+          "title": "Fill \"Ada\" getByLabel('Name')",
+          "category": "pw:api",
+          "location": {
+            "file": "scenario.spec.ts",
+            "line": 27,
+            "column": 35
+          }
+        }
+      ]
+    },
+    {
+      "title": "Expect \"toBe\"",
+      "category": "expect",
+      "location": {
+        "file": "scenario.spec.ts",
+        "line": 30,
+        "column": 56
+      }
+    },
+    {
+      "title": "Click getByRole('button', { name: 'Paint' })",
+      "category": "pw:api",
+      "location": {
+        "file": "scenario.spec.ts",
+        "line": 31,
+        "column": 53
+      }
+    },
+    {
+      "title": "Press \"Tab\"",
+      "category": "pw:api",
+      "location": {
+        "file": "scenario.spec.ts",
+        "line": 32,
+        "column": 23
+      }
+    },
+    {
+      "title": "After Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture"
+        },
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Close context",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
