@@ -1,3 +1,3 @@
-1. Open http://127.0.0.1:4321/ — The **step marker** element shows **STEP 1 HOME**
-2. Click the **sign in link** element — The **step marker** element shows **STEP 2 LOGIN**; the **username** element is visible
-3. Click the **submit bad credentials** element — The **error banner** element shows **Invalid credentials**; the **step marker** element shows **STEP 3 ERROR**
+1. Open http://127.0.0.1:4321/ — The page shows **STEP 1 HOME**
+2. Click the element — The page shows **STEP 2 LOGIN**; the element is visible
+3. Click the element — The page shows **Invalid credentials**; the page shows **STEP 3 ERROR**
