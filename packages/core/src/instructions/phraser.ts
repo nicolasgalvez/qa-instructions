@@ -2,6 +2,7 @@ import type {
   ActionEvent,
   CheckEvent,
   ElementTarget,
+  ExpectedPattern,
   UserActionKind,
 } from '../events.js';
 
@@ -86,6 +87,31 @@ const VALUE_CHECKS: Record<string, CheckWording> = {
     negative: 'is more than %v',
   },
 };
+
+/**
+ * Matchers that can expect a pattern, and what they match it against when
+ * the subject is the page. An element's or value's text needs no noun.
+ */
+const PATTERN_SUBJECTS: Record<
+  CheckEvent['subject'],
+  Record<string, string>
+> = {
+  page: { toHaveURL: 'the page address', toHaveTitle: 'the page title' },
+  element: { toHaveText: '', toContainText: '', toHaveValue: '' },
+  value: { toMatch: '' },
+};
+
+const CONTAINS: CheckWording = {
+  positive: 'contains %v',
+  negative: 'does not contain %v',
+};
+const MATCHES: CheckWording = {
+  positive: 'matches %v',
+  negative: 'does not match %v',
+};
+
+/** A pattern of plain text: nothing but literal characters and escaped punctuation. */
+const PLAIN_PATTERN = /^(?:[^\\^$.*+?()[\]{}|]|\\[^A-Za-z0-9])+$/;
 
 /**
  * Turns neutral Actions and checks into the plain-language sentences a
@@ -176,6 +202,10 @@ export class StepPhraser {
    * can be joined. Undefined when a tester could not see what was checked.
    */
   check(event: CheckEvent): string | undefined {
+    if (event.expected === undefined && event.expectedPattern) {
+      return this.patternCheck(event, event.expectedPattern);
+    }
+
     if (event.subject === 'value') {
       const wording = VALUE_CHECKS[event.matcher];
       if (!wording || !event.description || event.expected === undefined) {
@@ -197,6 +227,33 @@ export class StepPhraser {
       return undefined;
     }
     return `${subject} ${this.fill(wording, event)}`;
+  }
+
+  /**
+   * A check against a pattern. Plain text reads as what the subject must
+   * contain; any other pattern is shown as written.
+   */
+  private patternCheck(
+    event: CheckEvent,
+    pattern: ExpectedPattern,
+  ): string | undefined {
+    const noun = PATTERN_SUBJECTS[event.subject][event.matcher];
+    if (noun === undefined) return undefined;
+    const subject =
+      event.subject === 'page'
+        ? noun
+        : event.subject === 'element'
+          ? this.checkedElement(event)
+          : event.description && this.emphasize(event.description);
+    if (!subject) return undefined;
+
+    const plain = PLAIN_PATTERN.test(pattern.source);
+    const text = plain
+      ? pattern.source.replace(/\\(.)/g, '$1')
+      : `/${pattern.source}/${pattern.flags}`;
+    const wording = plain ? CONTAINS : MATCHES;
+    const template = event.negated ? wording.negative : wording.positive;
+    return `${subject} ${template.replace('%v', this.emphasize(text))}`;
   }
 
   /**

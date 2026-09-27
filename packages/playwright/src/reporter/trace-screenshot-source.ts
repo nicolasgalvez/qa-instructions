@@ -1,5 +1,6 @@
 import type {
   ActionCapture,
+  CheckCapture,
   QaBox,
   QaPoint,
   QaScreenshotMoment,
@@ -10,6 +11,7 @@ import type {
 import { ActionRef } from './action-ref.js';
 import { SnapshotTarget } from './snapshot-target.js';
 import { TraceArchive, type TraceEvent } from './trace-archive.js';
+import { TraceChecks } from './trace-checks.js';
 
 /**
  * Trace format versions this reader understands: 8 is written by Playwright
@@ -56,6 +58,8 @@ type CallRecord = {
   inputSnapshot?: string;
   passwordField?: boolean;
   viewport?: QaSize;
+  /** For a check the browser ran (`Frame.expect`): what it checked and expected. */
+  expect?: { selector?: string; expectedText?: unknown };
 };
 
 /** One frame of a page's screen recording. */
@@ -188,6 +192,7 @@ class TraceCalls {
         Object.assign(this.record(callId), {
           pageId: typeof event.pageId === 'string' ? event.pageId : undefined,
           startTime: this.number(event.startTime),
+          expect: this.expectParams(event),
         });
         break;
       case 'after':
@@ -237,6 +242,17 @@ class TraceCalls {
     if (target) record.passwordField = target.isPasswordField;
   }
 
+  private expectParams(event: TraceEvent): CallRecord['expect'] {
+    if (event.method !== 'expect' || !this.isRecord(event.params)) {
+      return undefined;
+    }
+    const { selector, expectedText } = event.params;
+    return {
+      selector: typeof selector === 'string' ? selector : undefined,
+      expectedText,
+    };
+  }
+
   private record(callId: string): CallRecord {
     let record = this.records.get(callId);
     if (!record) {
@@ -283,18 +299,20 @@ class TraceCalls {
  * Screenshot-source adapter over a Playwright trace (`trace.zip`). Joins each
  * `pw:api` step in the test runner's trace to the library call it made, and
  * returns that call's screen snapshots (or, without them, a frame of the
- * screen recording), element box, and click point.
+ * screen recording), element box, and click point. Also says what each
+ * check checked (see TraceChecks).
  * Never throws: an unreadable or unsupported trace gives no screenshots and
  * says why in `problem`.
  */
 export class TraceScreenshotSource implements ScreenshotSource {
   private constructor(
     private readonly captures: ReadonlyMap<string, ActionCapture>,
+    private readonly checks?: TraceChecks,
     readonly problem?: TraceProblem,
   ) {}
 
   static empty(problem?: TraceProblem): TraceScreenshotSource {
-    return new TraceScreenshotSource(new Map(), problem);
+    return new TraceScreenshotSource(new Map(), undefined, problem);
   }
 
   static async open(tracePath: string): Promise<TraceScreenshotSource> {
@@ -359,11 +377,19 @@ export class TraceScreenshotSource implements ScreenshotSource {
         viewport: record.viewport,
       });
     }
-    return new TraceScreenshotSource(captures);
+    const checks = new TraceChecks(
+      testEvents,
+      (stepId) => calls.forStep(stepId)?.expect,
+    );
+    return new TraceScreenshotSource(captures, checks);
   }
 
   capture(ref: string): ActionCapture | undefined {
     return this.captures.get(ref);
+  }
+
+  check(ref: string): CheckCapture | undefined {
+    return this.checks?.check(ref);
   }
 
   /**

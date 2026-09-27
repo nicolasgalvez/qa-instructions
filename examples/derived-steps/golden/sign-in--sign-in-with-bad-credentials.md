@@ -22,7 +22,7 @@
 
 5. Click the **Submit bad credentials** button
 
-   **Expected:** **Invalid credentials** is visible; the **Login failed** heading is visible
+   **Expected:** The page address contains **login-error**; **Invalid credentials** is visible; the **Login failed** heading is visible
 
    ![Step 5: Click the Submit bad credentials button](sign-in--sign-in-with-bad-credentials/step-05.png)
 

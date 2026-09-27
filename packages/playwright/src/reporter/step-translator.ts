@@ -7,7 +7,7 @@ import type {
   TestStartEvent,
 } from '@qa-instructions/core';
 
-import { ActionRefSequence } from './action-ref.js';
+import { StepRefs } from './action-ref.js';
 import { ACTION_KINDS } from './action-verbs.js';
 import { CallSiteReader, type CheckSite } from './call-site-reader.js';
 import { LocatorParser } from './locator-parser.js';
@@ -78,7 +78,7 @@ export class PlaywrightStepTranslator {
   translate(test: TestCase, result: TestResult): TestEvent[] {
     return [
       { ...this.testStart(test), attempt: result.retry + 1 },
-      ...this.translateSteps(result.steps, new ActionRefSequence()),
+      ...this.translateSteps(result.steps, new StepRefs()),
       { type: 'testEnd', status: result.status },
     ];
   }
@@ -100,21 +100,19 @@ export class PlaywrightStepTranslator {
     };
   }
 
-  /** `refs` numbers every `pw:api` step in order, translated or not. */
-  private translateSteps(
-    steps: TestStep[],
-    refs: ActionRefSequence,
-  ): TestEvent[] {
+  /** `refs` numbers every `pw:api` and `expect` step in order, translated or not. */
+  private translateSteps(steps: TestStep[], refs: StepRefs): TestEvent[] {
     return steps.flatMap((step): TestEvent[] => {
       switch (step.category) {
         case 'pw:api': {
-          const action = this.action(step, refs.next(step.title));
+          const action = this.action(step, refs.actions.next(step.title));
           this.skipCalls(step.steps, refs);
           return [action];
         }
         case 'expect': {
+          const ref = refs.checks.next(step.title);
           this.skipCalls(step.steps, refs);
-          const check = this.check(step);
+          const check = this.check(step, ref);
           if (check) return [check];
           return this.failed(step) ? [this.failureMarker()] : [];
         }
@@ -132,10 +130,11 @@ export class PlaywrightStepTranslator {
     });
   }
 
-  /** Numbers the `pw:api` calls inside a step that is not translated further. */
-  private skipCalls(steps: TestStep[], refs: ActionRefSequence): void {
+  /** Numbers the calls and checks inside a step that is not translated further. */
+  private skipCalls(steps: TestStep[], refs: StepRefs): void {
     for (const step of steps) {
-      if (step.category === 'pw:api') refs.next(step.title);
+      if (step.category === 'pw:api') refs.actions.next(step.title);
+      if (step.category === 'expect') refs.checks.next(step.title);
       this.skipCalls(step.steps, refs);
     }
   }
@@ -144,7 +143,7 @@ export class PlaywrightStepTranslator {
    * A grouping step's calls, plus a failure marker when the step failed but
    * none of its calls or checks did (e.g. an error thrown in a `test.step`).
    */
-  private innerSteps(step: TestStep, refs: ActionRefSequence): TestEvent[] {
+  private innerSteps(step: TestStep, refs: StepRefs): TestEvent[] {
     const events = this.translateSteps(step.steps, refs);
     const failedInside = events.some(
       (event) => 'failed' in event && event.failed,
@@ -191,7 +190,7 @@ export class PlaywrightStepTranslator {
    * quantity')`): then the title is that message, and the matcher is read
    * from the source.
    */
-  private check(step: TestStep): CheckEvent | undefined {
+  private check(step: TestStep, ref: string): CheckEvent | undefined {
     const titled = this.titledCheck(step.title);
     const site = this.checkSite(step, titled === undefined);
     const matcher = titled?.matcher ?? site?.matcher;
@@ -209,6 +208,7 @@ export class PlaywrightStepTranslator {
       expected: this.text(this.params(step).expected) ?? site?.expected,
       ...(titled ? {} : { description: step.title }),
       failed: this.failed(step),
+      ref,
     };
   }
 

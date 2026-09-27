@@ -11,12 +11,30 @@ export class ActionRef {
   }
 }
 
+/**
+ * The same join for one `expect` step: its position among the test's
+ * `expect` steps, and its title (the matcher, or the check's message).
+ */
+export class CheckRef {
+  static of(ordinal: number, title: string): string {
+    return `${ordinal}:${title}`;
+  }
+}
+
 /** Numbers one test's `pw:api` steps, in the order they began. */
 export class ActionRefSequence {
   private count = 0;
 
+  constructor(private readonly ref = ActionRef.of) {}
+
   next(title: string): string {
     this.count += 1;
-    return ActionRef.of(this.count, title);
+    return this.ref(this.count, title);
   }
+}
+
+/** Numbers one test's `pw:api` and `expect` steps, each in the order they began. */
+export class StepRefs {
+  readonly actions = new ActionRefSequence(ActionRef.of);
+  readonly checks = new ActionRefSequence(CheckRef.of);
 }
