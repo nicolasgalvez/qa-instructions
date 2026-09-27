@@ -119,19 +119,22 @@ export class SnapshotTarget {
   }
 
   /**
-   * What the page showed of the element, how many elements on the page
-   * looked like it, and the part of the page it sits in. `scope` is the CSS
+   * What the page showed of the element, what titles it as a part of the
+   * page, how many elements on the page looked like it, and the part of the
+   * page it sits in. `scope` is the CSS
    * of the element the test narrowed its search to, if any.
    */
   recorded(scope?: string): RecordedElement {
     const lookalikes = this.lookalikes();
     const region = this.region(scope, lookalikes);
+    const title = this.title(this.element);
     return {
       tag: this.element.name,
       attributes: this.attributesOf(this.element),
       text: this.textOf(this.element),
       labels: this.labels(this.element),
       lookalikes: lookalikes.length + 1,
+      ...(title ? { title } : {}),
       ...(region ? { region } : {}),
     };
   }

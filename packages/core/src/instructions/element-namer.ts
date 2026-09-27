@@ -99,6 +99,18 @@ const TEXT_NAMED_ROLES: ReadonlySet<string> = new Set([
   'listitem',
 ]);
 
+/**
+ * Parts of the page a tester names by their title, as when a later step
+ * says an element is "in the **Energy** form".
+ */
+export const PART_ROLES: ReadonlySet<string> = new Set([
+  'form',
+  'dialog',
+  'row',
+  'table',
+  'navigation',
+]);
+
 /** Text longer than this is content, not a name. */
 const MAX_NAME_LENGTH = 80;
 
@@ -156,8 +168,9 @@ export class ElementNamer {
 
   /**
    * The name a tester sees, in the order browsers name elements: what
-   * labels it, then its own words (a button's value, an image's alt text,
-   * the text inside it), then its tooltip or placeholder.
+   * labels it (or, for a part of the page, what titles it), then its own
+   * words (a button's value, an image's alt text, the text inside it), then
+   * its tooltip or placeholder.
    */
   private accessibleName(
     element: RecordedElement,
@@ -176,6 +189,7 @@ export class ElementNamer {
     const candidates = [
       element.labels.join(' '),
       attributes['aria-label'],
+      role !== undefined && PART_ROLES.has(role) ? element.title : undefined,
       buttonInput,
       attributes.alt,
       text,

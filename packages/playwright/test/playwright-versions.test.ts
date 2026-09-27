@@ -142,7 +142,9 @@ test('Playwright 1.56 with a trace reads checks on variables and computed values
     [
       {
         action: 'Open http://127.0.0.1:4321/shop',
-        expected: '**purchase form for 1174** is visible',
+        // The checked form by its heading, as the later steps name it, not
+        // by the check's message.
+        expected: 'The **Forest carbon credits** form is visible',
       },
       // The field's label, as the page was recorded, and the product form
       // the test found it in, by that form's heading.
