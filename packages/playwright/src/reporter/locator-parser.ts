@@ -1,5 +1,7 @@
 import type { ElementTarget } from '@qa-instructions/core';
 
+import { CssHint } from './css-hint.js';
+
 type Call = { name: string; args: string };
 
 const BY_METHOD: Record<string, Exclude<ElementTarget['by'], 'role'>> = {
@@ -26,6 +28,8 @@ const RECEIVER = /^(?:[A-Za-z_$][\w$]*\s*\??\.\s*)+(?=[A-Za-z_$][\w$]*\s*\()/;
  * element it ends on as a neutral ElementTarget.
  */
 export class LocatorParser {
+  constructor(private readonly css = new CssHint()) {}
+
   parse(locator: string | undefined): ElementTarget | undefined {
     if (!locator) return undefined;
 
@@ -51,7 +55,8 @@ export class LocatorParser {
 
     const by = BY_METHOD[name];
     const value = literals[0];
-    return by && value !== undefined ? { by, value } : undefined;
+    if (!by || value === undefined) return undefined;
+    return by === 'selector' ? this.css.target(value) : { by, value };
   }
 
   /** Splits a chain into top-level `name(args)` calls. */

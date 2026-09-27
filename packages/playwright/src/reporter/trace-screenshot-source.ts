@@ -5,6 +5,7 @@ import type {
   QaPoint,
   QaScreenshotMoment,
   QaSize,
+  RecordedElement,
   ScreenshotSource,
 } from '@qa-instructions/core';
 
@@ -12,6 +13,7 @@ import { ActionRef } from './action-ref.js';
 import { PageStates } from './page-states.js';
 import { RecordingFrames, type RecordedCall } from './recording-frames.js';
 import { Screencast } from './screencast.js';
+import { FrameSnapshots } from './snapshot-dom.js';
 import { SnapshotTarget } from './snapshot-target.js';
 import { TraceArchive, type TraceEvent } from './trace-archive.js';
 import { TraceChecks } from './trace-checks.js';
@@ -84,6 +86,8 @@ type CallRecord = {
   /** The DOM snapshot taken as the input was sent, which dates the Action. */
   inputSnapshot?: string;
   passwordField?: boolean;
+  /** The element the call touched, from the first DOM snapshot marking it. */
+  element?: RecordedElement;
   viewport?: QaSize;
   /** For a check the browser ran (`Frame.expect`): what it checked and expected. */
   expect?: { selector?: string; expectedText?: unknown };
@@ -104,6 +108,8 @@ class TraceCalls {
   private readonly records = new Map<string, CallRecord>();
   /** When each DOM snapshot was taken, by snapshot name. */
   private readonly snapshotTimes = new Map<string, number>();
+  /** Each frame's DOM snapshots, by frame id. */
+  private readonly frames = new Map<string, FrameSnapshots>();
   private viewport?: QaSize;
   /** The context's wall-clock time minus its trace-clock time. */
   private wallClockOffset?: number;
@@ -256,10 +262,13 @@ class TraceCalls {
    * kept too: the input snapshot's time dates the Action.
    */
   private addSnapshot(snapshot: unknown): void {
-    if (!this.isRecord(snapshot) || typeof snapshot.callId !== 'string') {
-      return;
-    }
+    if (!this.isRecord(snapshot)) return;
+    // Every snapshot of a frame is kept: later ones refer back to them.
+    const frame = this.frame(snapshot.frameId);
+    const index = frame.add(snapshot.html);
+    if (typeof snapshot.callId !== 'string') return;
     this.pages.add(snapshot);
+
     const { snapshotName, timestamp } = snapshot;
     if (
       typeof snapshotName === 'string' &&
@@ -269,9 +278,22 @@ class TraceCalls {
       this.snapshotTimes.set(snapshotName, timestamp);
     }
     const record = this.record(snapshot.callId);
-    if (record.passwordField !== undefined) return;
-    const target = SnapshotTarget.find(snapshot.html);
-    if (target) record.passwordField = target.isPasswordField;
+    if (record.element || !SnapshotTarget.isMarkedIn(snapshot.html)) return;
+    const target = SnapshotTarget.find(frame.document(index), snapshot.callId);
+    if (target) {
+      record.passwordField = target.isPasswordField;
+      record.element = target.recorded();
+    }
+  }
+
+  private frame(frameId: unknown): FrameSnapshots {
+    const key = typeof frameId === 'string' ? frameId : '';
+    let frame = this.frames.get(key);
+    if (!frame) {
+      frame = new FrameSnapshots();
+      this.frames.set(key, frame);
+    }
+    return frame;
   }
 
   private expectParams(event: TraceEvent): CallRecord['expect'] {
@@ -407,13 +429,14 @@ export class TraceScreenshotSource implements ScreenshotSource {
         box: record.box,
         point: record.point,
         passwordField: record.passwordField,
+        element: record.element,
         viewport: record.viewport,
       });
     }
-    const checks = new TraceChecks(
-      testEvents,
-      (stepId) => calls.forStep(stepId)?.expect,
-    );
+    const checks = new TraceChecks(testEvents, (stepId) => {
+      const record = calls.forStep(stepId);
+      return record?.expect && { ...record.expect, element: record.element };
+    });
     return new TraceScreenshotSource(captures, checks);
   }
 

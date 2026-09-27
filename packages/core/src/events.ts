@@ -6,19 +6,25 @@
  * on a test runner's types.
  */
 
-/** How the test identified an element, in the terms a tester can see. */
+/**
+ * How the test identified an element. Roles, labels, and texts are terms a
+ * tester can see; test ids and selectors are not, so a QA Step never shows
+ * them and names the element from the page as recorded instead.
+ */
 export type ElementTarget =
   | { by: 'role'; role: string; name?: string }
   | {
-      by:
-        | 'label'
-        | 'text'
-        | 'placeholder'
-        | 'altText'
-        | 'title'
-        | 'testId'
-        | 'selector';
+      by: 'label' | 'text' | 'placeholder' | 'altText' | 'title';
       value: string;
+    }
+  | { by: 'testId'; value: string }
+  | {
+      by: 'selector';
+      value: string;
+      /** The tag the selector requires of the element, when it names one. */
+      tag?: string;
+      /** The `type` attribute the selector requires, e.g. `radio`. */
+      type?: string;
     };
 
 /** Things a person can do in a browser. */

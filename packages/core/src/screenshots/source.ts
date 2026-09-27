@@ -14,6 +14,24 @@ export type Screenshot = {
   data: Buffer;
 };
 
+/**
+ * An element as the page showed it when the test touched it, read from a
+ * recording of the page rather than from the test code.
+ */
+export type RecordedElement = {
+  /** Lowercase tag name, e.g. `button`. */
+  tag: string;
+  /** Its attributes as recorded, e.g. `type`, `role`, `aria-label`, `value`. */
+  attributes: Record<string, string>;
+  /** The text inside it a person can see, whitespace collapsed. */
+  text: string;
+  /**
+   * The text of what labels it: the elements its `aria-labelledby` names, or
+   * a `<label>` for it or around it.
+   */
+  labels: string[];
+};
+
 /** What was captured for one Action. Any part may be missing. */
 export type ActionCapture = {
   /** The page around the Action, at each moment that was captured. */
@@ -27,6 +45,8 @@ export type ActionCapture = {
    * was recorded (not as the test code suggests). Undefined when unknown.
    */
   passwordField?: boolean;
+  /** The element the Action touched, as the page was recorded. */
+  element?: RecordedElement;
   /** The page's viewport when the screenshots were taken, in CSS pixels. */
   viewport?: QaSize;
 };
@@ -40,6 +60,8 @@ export type CheckCapture = {
   target?: ElementTarget;
   expected?: string;
   expectedPattern?: ExpectedPattern;
+  /** The element the check looked at, as the page was recorded. */
+  element?: RecordedElement;
 };
 
 export interface ScreenshotSource {

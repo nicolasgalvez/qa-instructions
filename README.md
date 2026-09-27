@@ -35,7 +35,8 @@ export default defineConfig({
   ],
   use: {
     // Step Screenshots: a screenshot of the page per Action. DOM snapshots
-    // let the reporter recognize password fields.
+    // let the reporter recognize password fields and name elements found by
+    // test id or CSS selector.
     // Playwright 1.63+:
     trace: { mode: 'on', snapshots: { screen: true, dom: true } },
     // Playwright 1.53–1.62: trace: 'on',
@@ -168,7 +169,7 @@ On 1.53–1.62 the QA Steps and Expected Results read the same as on 1.63; scree
 
 Each test's browser Actions (opening a URL, clicking, typing, pressing keys, choosing options) become numbered QA Steps, and the `expect` checks that follow an Action become its Expected Result. Waits, scripts, value reads, and API requests are left out because a tester cannot repeat them. A test's `test.step` groups become Sections (see [`testSteps`](#teststeps)).
 
-A check's message names what it checks. `expect(cartQty, 'cart line-item quantity').toBe(3)` reads "**cart line-item quantity** is **3**", so a value the test read from the page still tells the tester what to look for; a value checked without a message is left out. On an element, the message is used only when the element has no readable name (a CSS selector, or a role without a name): `expect(form, 'purchase form').toBeVisible()` on `locator('#purchase_1174')` reads "**purchase form** is visible".
+A check's message names what it checks. `expect(cartQty, 'cart line-item quantity').toBe(3)` reads "**cart line-item quantity** is **3**", so a value the test read from the page still tells the tester what to look for; a value checked without a message is left out. On an element, the message is used only when the element has no readable name (a CSS selector, a test id, or a role without a name) and the page as recorded gives it none: `expect(form, 'purchase form').toBeVisible()` on `locator('#purchase_1174')` reads "**purchase form** is visible".
 
 A check against a regular expression needs the trace, which records the pattern. Plain text reads as what must appear (`toHaveURL(/login-error/)`: "The page address contains **login-error**"); any other pattern is shown as written ("matches **/^\/orders\/\d+$/**").
 
@@ -178,6 +179,14 @@ A check against a regular expression needs the trace, which records the pattern.
 3. Type **demo-user** into **Username**
 4. Click the **Submit bad credentials** button — The page address contains **login-error**; **Invalid credentials** is visible; the **Login failed** heading is visible
 5. Press **Tab**
+```
+
+Elements are named the way the test found them when that is something a tester sees: a role and name, a label, a text. A test id or CSS selector is never shown. Instead the element is named from the page as the trace's DOM snapshots recorded it: its label, its accessible name, or the text it shows, plus what kind of element it is. Without DOM snapshots the step says only what kind of element it is (or uses the check's message, if it has one).
+
+```
+2. Check the **RECs (one time purchase)** option
+3. Type **3** into the number field — The number field shows **3**
+4. Click the **Add to Cart** button — The page shows **3 × Renewable Energy Certificates (RECs) in your cart**
 ```
 
 ## Render

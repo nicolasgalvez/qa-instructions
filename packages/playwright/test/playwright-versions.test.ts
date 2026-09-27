@@ -134,11 +134,31 @@ const CART_TRACE = fileURLToPath(
   new URL('../../test/fixtures/traces/v8-checks.zip', import.meta.url),
 );
 
-test('Playwright 1.56 with a trace reads checks on variables and computed values as 1.63 does', async () => {
+test('Playwright 1.56 with a trace reads checks on variables and computed values, and names elements from its DOM snapshots', async () => {
   const cart = 'add-credits-to-the-cart';
+  const bundle = await bundleFrom('1.56', cart, undefined, CART_TRACE);
   assert.deepEqual(
-    qaSteps(await bundleFrom('1.56', cart, undefined, CART_TRACE)),
-    qaSteps(await bundleFrom('1.63', cart)),
+    bundle.steps.map(({ action, expected }) => ({ action, expected })),
+    [
+      {
+        action: 'Open http://127.0.0.1:4321/shop',
+        expected: '**purchase form for 1174** is visible',
+      },
+      // The field's label, as the page was recorded.
+      {
+        action: 'Type **3** into **Quantity**',
+        expected: '**Quantity** shows **3**',
+      },
+      {
+        action: 'Click the **Purchase** button',
+        expected: '**Added to cart** is visible',
+      },
+      {
+        action: 'Open http://127.0.0.1:4321/cart',
+        expected:
+          '**cart line-item quantity** is **3**; **cart subtotal (qty × unit price)** is **15**',
+      },
+    ],
   );
 });
 
@@ -160,10 +180,10 @@ test("checks titled with the author's message are Expected Results named by the 
         action: 'Open http://127.0.0.1:4321/shop',
         expected: '**purchase form for 1174** is visible',
       },
+      // No trace: the CSS selector's element is described plainly.
       {
-        action:
-          'Type **3** into the **input[name="download_quantity"]** element',
-        expected: 'The **input[name="download_quantity"]** element shows **3**',
+        action: 'Type **3** into the field',
+        expected: 'The field shows **3**',
       },
       {
         action: 'Click the **Purchase** button',

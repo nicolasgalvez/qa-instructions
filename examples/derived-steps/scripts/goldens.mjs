@@ -89,6 +89,11 @@ export const GOLDENS = [
       'qa-steps-out/long-page--order-boots-from-the-bottom-of-the-page.txt',
     golden: 'golden/long-page--order-boots-from-the-bottom-of-the-page.txt',
   },
+  // Elements found by CSS selector and test id, named as the page shows them.
+  {
+    rendered: 'qa-steps-out/certificates--add-three-recs-to-the-cart.txt',
+    golden: 'golden/certificates--add-three-recs-to-the-cart.txt',
+  },
 ];
 
 const DATA_URI = /data:image\/png;base64,[A-Za-z0-9+/=]+/g;

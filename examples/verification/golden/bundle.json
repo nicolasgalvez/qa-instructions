@@ -13,18 +13,18 @@
     {
       "index": 1,
       "action": "Open http://127.0.0.1:4321/",
-      "expected": "The **step marker** element shows **STEP 1 HOME**",
+      "expected": "The page shows **STEP 1 HOME**",
       "url": "http://127.0.0.1:4321/"
     },
     {
       "index": 2,
-      "action": "Click the **sign in link** element",
-      "expected": "The **step marker** element shows **STEP 2 LOGIN**; the **username** element is visible"
+      "action": "Click the element",
+      "expected": "The page shows **STEP 2 LOGIN**; the element is visible"
     },
     {
       "index": 3,
-      "action": "Click the **submit bad credentials** element",
-      "expected": "The **error banner** element shows **Invalid credentials**; the **step marker** element shows **STEP 3 ERROR**"
+      "action": "Click the element",
+      "expected": "The page shows **Invalid credentials**; the page shows **STEP 3 ERROR**"
     }
   ],
   "assets": {}

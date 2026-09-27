@@ -82,10 +82,11 @@ const TYPING: ReadonlySet<ActionKind> = new Set<UserActionKind>([
 
 type PendingStep = {
   /**
-   * The step's words, or its user Action, phrased once the screenshot source
-   * says whether it touched a password field.
+   * The step's words, or the Action it describes (a user Action, or for a
+   * warning step the script), phrased once the screenshot source says what
+   * the Action touched on the page.
    */
-  action: string | UserActionEvent;
+  action: string | ActionEvent;
   url?: string;
   section?: string[];
   /**
@@ -237,11 +238,13 @@ export class QaInstructionsRecorder implements TestEventSink {
   }
 
   private phrase(step: PendingStep, capture: ActionCapture | undefined) {
-    return typeof step.action === 'string'
-      ? step.action
-      : this.phraser.action(step.action, step.url, {
-          password: capture?.passwordField === true,
-        });
+    if (typeof step.action === 'string') return step.action;
+    const recorded = { element: capture?.element };
+    if (step.warning) return this.phraser.scriptChange(step.action, recorded);
+    return this.phraser.action(step.action as UserActionEvent, step.url, {
+      ...recorded,
+      password: capture?.passwordField === true,
+    });
   }
 
   /** Nothing after the first failure is a QA Step: the tester stops there. */
@@ -284,7 +287,7 @@ export class QaInstructionsRecorder implements TestEventSink {
   private warn(event: ActionEvent): void {
     this.collapsedStep = undefined;
     this.steps.push({
-      action: this.phraser.scriptChange(event),
+      action: event,
       section: this.currentSection(),
       checks: [],
       warning: true,
@@ -331,7 +334,13 @@ export class QaInstructionsRecorder implements TestEventSink {
     source: ScreenshotSource,
   ): { phrase: string; failed?: boolean }[] {
     return checks.flatMap((event) => {
-      const phrase = this.phraser.check(this.completed(event, source));
+      const element =
+        event.ref === undefined
+          ? undefined
+          : source.check?.(event.ref)?.element;
+      const phrase = this.phraser.check(this.completed(event, source), {
+        element,
+      });
       return phrase ? [{ phrase, failed: event.failed }] : [];
     });
   }

@@ -250,7 +250,8 @@ test('each Action names the element as a tester sees it', () => {
       { action: 'Check the **Remember me** checkbox' },
       { action: 'Hover over **Products**' },
       { action: 'Double-click the button' },
-      { action: 'Click the **sign in link** element' },
+      // A test id is not something a tester sees on the page.
+      { action: 'Click the element' },
       { action: 'Clear **Notes**' },
       { action: 'Reload the page' },
     ],
@@ -477,7 +478,7 @@ test('an element check with a message names the element by the message only when
       {
         action: 'Reload the page',
         expected:
-          '**purchase form** is visible; **quantity field** is visible; **buy button** is visible; **Added to cart** is visible; the **#total** element is visible',
+          '**purchase form** is visible; **quantity field** is visible; **buy button** is visible; **Added to cart** is visible; the element is visible',
       },
     ],
   );
@@ -578,7 +579,7 @@ test('a script that changes the page is a warning step, in sequence', () => {
       { action: 'Open http://127.0.0.1:4321/faq' },
       {
         action:
-          'The test changed the **details:not([open])** element with a script instead of a user action. If the page does not match what comes next, change it by hand to continue.',
+          'The test changed the element with a script instead of a user action. If the page does not match what comes next, change it by hand to continue.',
         expected: '**Orders ship in 2 days** is visible',
         warning: true,
       },

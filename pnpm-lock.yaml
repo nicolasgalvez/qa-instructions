@@ -139,6 +139,15 @@ importers:
       '@qa-instructions/core':
         specifier: workspace:*
         version: link:../core
+      css-what:
+        specifier: ^7.0.0
+        version: 7.0.0
+      domhandler:
+        specifier: ^5.0.3
+        version: 5.0.3
+      domutils:
+        specifier: ^3.2.2
+        version: 3.2.2
       fflate:
         specifier: ^0.8.3
         version: 0.8.3

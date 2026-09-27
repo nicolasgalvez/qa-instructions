@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@qa-instructions/core": "workspace:*",
+    "css-what": "^7.0.0",
+    "domhandler": "^5.0.3",
+    "domutils": "^3.2.2",
     "fflate": "^0.8.3",
     "sharp": "^0.35.4"
   },
