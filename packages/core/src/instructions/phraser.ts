@@ -7,6 +7,7 @@ import type {
 } from '../events.js';
 import type { RecordedElement } from '../screenshots/source.js';
 import { ElementNamer, ROLE_NOUNS, type ElementName } from './element-namer.js';
+import { RegionNamer } from './region-namer.js';
 
 /** Checks about the text an element shows, which therefore cannot name it. */
 const TEXT_MATCHERS: ReadonlySet<string> = new Set([
@@ -110,7 +111,10 @@ const PLAIN_PATTERN = /^(?:[^\\^$.*+?()[\]{}|]|\\[^A-Za-z0-9])+$/;
  * tester reads. Knows nothing about any test runner.
  */
 export class StepPhraser {
-  constructor(private readonly namer = new ElementNamer()) {}
+  constructor(
+    private readonly namer = new ElementNamer(),
+    private readonly regions = new RegionNamer(namer),
+  ) {}
 
   /**
    * The "do this" sentence for a user Action. Text typed into a password
@@ -291,14 +295,28 @@ export class StepPhraser {
   }
 
   /**
-   * The element as a tester sees it, e.g. `the **Sign in** link`. An element
-   * the test found by test id or selector is named from the page as recorded
-   * (`element`), or plainly by its kind; the selector itself is never shown.
+   * The element as a tester sees it, e.g. `the **Sign in** link`, and the
+   * part of the page it is in when that tells it apart (`… in the
+   * **Energy** form`). An element the test found by test id or selector is
+   * named from the page as recorded (`element`), or plainly by its kind; the
+   * selector itself is never shown.
    */
   target(
     target: ElementTarget | undefined,
-    { element }: RecordedFacts = {},
-    { byOwnText = true, unnamed = 'the element' } = {},
+    recorded: RecordedFacts = {},
+    options: { byOwnText?: boolean; unnamed?: string } = {},
+  ): string {
+    const named = this.element(target, recorded, options);
+    const region = this.regions.name(recorded.element);
+    return region && named !== 'the page'
+      ? `${named} in the ${this.emphasize(region.title)} ${region.noun}`
+      : named;
+  }
+
+  private element(
+    target: ElementTarget | undefined,
+    { element }: RecordedFacts,
+    { byOwnText = true, unnamed = 'the element' },
   ): string {
     if (!target && !element) return 'the page';
     if (!target || target.by === 'testId' || target.by === 'selector') {

@@ -183,10 +183,12 @@ A check against a regular expression needs the trace, which records the pattern.
 
 Elements are named the way the test found them when that is something a tester sees: a role and name, a label, a text. A test id or CSS selector is never shown. Instead the element is named from the page as the trace's DOM snapshots recorded it: its label, its accessible name, or the text it shows, plus what kind of element it is. Without DOM snapshots the step says only what kind of element it is (or uses the check's message, if it has one).
 
+When the test found the element inside another one (`form.locator(…)` on `page.locator('#edd_purchase_102')`), or the page has another element that looks the same, the step also says which part of the page it is in, by that part's title as recorded: its label, or the heading, legend, or caption inside it or just before it. A part with no such title, or the page body, adds nothing.
+
 ```
-2. Check the **RECs (one time purchase)** option
-3. Type **3** into the number field — The number field shows **3**
-4. Click the **Add to Cart** button — The page shows **3 × Renewable Energy Certificates (RECs) in your cart**
+2. Check the **RECs (one time purchase)** option in the **Renewable Energy Certificates (RECs)** form
+3. Type **3** into the number field in the **Renewable Energy Certificates (RECs)** form — The number field in the **Renewable Energy Certificates (RECs)** form shows **3**
+4. Click the **Add to Cart** button in the **Renewable Energy Certificates (RECs)** form — The page shows **3 × Renewable Energy Certificates (RECs) in your cart**
 ```
 
 ## Render

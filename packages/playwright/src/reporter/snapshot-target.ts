@@ -1,6 +1,14 @@
-import type { RecordedElement } from '@qa-instructions/core';
+import type { RecordedElement, RecordedRegion } from '@qa-instructions/core';
+import { is } from 'css-select';
 import type { AnyNode, Document, Element } from 'domhandler';
-import { findAll, findOne, getParent, isTag, isText } from 'domutils';
+import {
+  findAll,
+  findOne,
+  getParent,
+  isTag,
+  isText,
+  prevElementSibling,
+} from 'domutils';
 
 /**
  * Playwright marks the element an action touched in its DOM snapshots
@@ -16,6 +24,17 @@ const UNREAD = new Set(['script', 'style', 'noscript', 'template', 'head']);
 
 /** Form controls, whose options and values are not part of a label's text. */
 const CONTROLS = new Set(['select', 'textarea', 'input', 'button']);
+
+/** `<input>` types a tester reads by their `value`. */
+const BUTTON_TYPES = new Set(['button', 'submit', 'reset']);
+
+/** The page itself, which a tester never needs told they are on. */
+const PAGE = new Set(['html', 'body']);
+
+const HEADINGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+
+/** Elements that title the part of the page they are in. */
+const TITLES = new Set([...HEADINGS, 'legend', 'caption']);
 
 /** Elements that sit inside a line of text rather than starting a new one. */
 const INLINE = new Set([
@@ -99,41 +118,177 @@ export class SnapshotTarget {
     );
   }
 
-  /** What the page showed of the element. */
-  recorded(): RecordedElement {
+  /**
+   * What the page showed of the element, how many elements on the page
+   * looked like it, and the part of the page it sits in. `scope` is the CSS
+   * of the element the test narrowed its search to, if any.
+   */
+  recorded(scope?: string): RecordedElement {
+    const lookalikes = this.lookalikes();
+    const region = this.region(scope, lookalikes);
     return {
       tag: this.element.name,
-      attributes: Object.fromEntries(
-        Object.entries(this.element.attribs).filter(
-          ([name]) => !PLAYWRIGHT_ATTRIBUTE.test(name),
-        ),
-      ),
+      attributes: this.attributesOf(this.element),
       text: this.textOf(this.element),
-      labels: this.labels(),
+      labels: this.labels(this.element),
+      lookalikes: lookalikes.length + 1,
+      ...(region ? { region } : {}),
     };
   }
 
+  private attributesOf(element: Element): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(element.attribs).filter(
+        ([name]) => !PLAYWRIGHT_ATTRIBUTE.test(name),
+      ),
+    );
+  }
+
+  /** The other elements on the page a tester could take for this one. */
+  private lookalikes(): Element[] {
+    const own = this.looks(this.element);
+    return findAll(
+      (el) =>
+        el !== this.element &&
+        el.name === this.element.name &&
+        this.looks(el) === own,
+      this.document.children,
+    );
+  }
+
+  /** What a tester sees of an element: its kind and its words. */
+  private looks(element: Element): string {
+    const { attribs, name } = element;
+    const buttonValue =
+      name === 'input' && BUTTON_TYPES.has(attribs.type?.toLowerCase() ?? '')
+        ? attribs.value
+        : undefined;
+    return JSON.stringify([
+      name,
+      attribs.type?.toLowerCase(),
+      attribs.role,
+      attribs['aria-label'],
+      attribs.alt,
+      attribs.title,
+      attribs.placeholder,
+      buttonValue,
+      this.textOf(element),
+      this.labels(element),
+    ]);
+  }
+
   /**
-   * What labels the element: the elements its `aria-labelledby` names, else
+   * The part of the page the element sits in: the element the test
+   * narrowed its search to, when it is more than the page itself and has a
+   * title, else, when the page has lookalikes of the element, the largest
+   * titled part around it that holds none of them.
+   */
+  private region(
+    scope: string | undefined,
+    lookalikes: Element[],
+  ): RecordedRegion | undefined {
+    const ancestors = this.ancestors(this.element).filter(
+      (el) => !PAGE.has(el.name),
+    );
+    const scoped = scope
+      ? ancestors.find((el) => this.matches(el, scope))
+      : undefined;
+    const scopeTitle = scoped && this.title(scoped);
+    if (scoped && scopeTitle) {
+      return this.regionOf(scoped, scopeTitle, true);
+    }
+
+    if (lookalikes.length === 0) return undefined;
+    const holdsLookalike = (el: Element) =>
+      lookalikes.some((other) => this.ancestors(other).includes(el));
+    let region: RecordedRegion | undefined;
+    for (const ancestor of ancestors) {
+      if (holdsLookalike(ancestor)) break;
+      const title = this.title(ancestor);
+      if (title) region = this.regionOf(ancestor, title, false);
+    }
+    return region;
+  }
+
+  private regionOf(
+    element: Element,
+    title: string,
+    scope: boolean,
+  ): RecordedRegion {
+    return {
+      tag: element.name,
+      attributes: this.attributesOf(element),
+      title,
+      scope,
+    };
+  }
+
+  private matches(element: Element, css: string): boolean {
+    try {
+      return is(element, css);
+    } catch {
+      // Playwright's own CSS extensions (`:has-text`) are not plain CSS.
+      return false;
+    }
+  }
+
+  /**
+   * What the page titles a part of it: its label, else the first heading,
+   * legend, or caption inside it, else a heading just before it. A heading
+   * holding the element itself names the element, not the part.
+   */
+  private title(part: Element): string | undefined {
+    const labelled = this.labelledBy(part)
+      .map((label) => this.textOf(label))
+      .join(' ')
+      .trim();
+    const inside = findOne(
+      (el) =>
+        TITLES.has(el.name) &&
+        this.shown(el, false) &&
+        !this.ancestors(this.element).includes(el) &&
+        this.textOf(el) !== '',
+      part.children,
+    );
+    let before = prevElementSibling(part);
+    while (before && !this.shown(before, false)) {
+      before = prevElementSibling(before);
+    }
+    const heading = before && HEADINGS.has(before.name) ? before : undefined;
+    return (
+      [
+        labelled,
+        part.attribs['aria-label']?.trim(),
+        inside && this.textOf(inside),
+        heading && this.textOf(heading),
+      ].find((title) => title) || undefined
+    );
+  }
+
+  /**
+   * What labels an element: the elements its `aria-labelledby` names, else
    * any `<label for>` it and the `<label>` around it.
    */
-  private labels(): string[] {
-    const { attribs } = this.element;
-    const labelledBy = (attribs['aria-labelledby'] ?? '')
-      .split(/\s+/)
-      .filter(Boolean)
-      .flatMap((id) => this.byId(id));
+  private labels(element: Element): string[] {
+    const labelledBy = this.labelledBy(element);
     // A label can both point at the element and wrap it: once is enough.
     const labels =
       labelledBy.length > 0
         ? labelledBy
         : new Set([
-            ...(attribs.id ? this.labelsFor(attribs.id) : []),
-            ...this.ancestors().filter((el) => el.name === 'label'),
+            ...(element.attribs.id ? this.labelsFor(element.attribs.id) : []),
+            ...this.ancestors(element).filter((el) => el.name === 'label'),
           ]);
     return [...labels]
       .map((label) => this.textOf(label, { skipControls: true }))
       .filter(Boolean);
+  }
+
+  private labelledBy(element: Element): Element[] {
+    return (element.attribs['aria-labelledby'] ?? '')
+      .split(/\s+/)
+      .filter(Boolean)
+      .flatMap((id) => this.byId(id));
   }
 
   private byId(id: string): Element[] {
@@ -148,10 +303,10 @@ export class SnapshotTarget {
     );
   }
 
-  private ancestors(): Element[] {
+  private ancestors(element: Element): Element[] {
     const ancestors: Element[] = [];
     for (
-      let parent = getParent(this.element);
+      let parent = getParent(element);
       parent && isTag(parent);
       parent = getParent(parent)
     ) {

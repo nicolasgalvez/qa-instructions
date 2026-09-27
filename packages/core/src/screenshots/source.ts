@@ -30,6 +30,33 @@ export type RecordedElement = {
    * a `<label>` for it or around it.
    */
   labels: string[];
+  /**
+   * How many elements on the page looked like it (same kind, same visible
+   * words), itself included. More than one means its name alone does not
+   * tell a tester which one.
+   */
+  lookalikes?: number;
+  /** The part of the page it sits in, as the page showed it. */
+  region?: RecordedRegion;
+};
+
+/**
+ * A part of the page an element sits in, e.g. one product's form among
+ * several: the part the test narrowed its search to, or else the nearest
+ * titled part that holds no lookalike of the element.
+ */
+export type RecordedRegion = {
+  /** Lowercase tag name, e.g. `form`. */
+  tag: string;
+  /** Its attributes as recorded, e.g. `role`. */
+  attributes: Record<string, string>;
+  /**
+   * What the page titles it: its label, or the heading, legend, or caption
+   * inside it or just before it. Undefined when it has none.
+   */
+  title?: string;
+  /** The test found the element inside this part (e.g. `form.locator(…)`). */
+  scope: boolean;
 };
 
 /** What was captured for one Action. Any part may be missing. */
