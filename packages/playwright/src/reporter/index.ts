@@ -7,6 +7,7 @@ import {
   TestSelection,
   type TestSelectionOptions,
   writeBundle,
+  type SectionPresentation,
 } from '@qa-instructions/core';
 
 import { PlaywrightStepTranslator } from './step-translator.js';
@@ -19,6 +20,12 @@ export type QaInstructionsReporterOptions = {
    * Default: every test. Unselected tests still run and produce nothing.
    */
   select?: TestSelectionOptions;
+  /**
+   * How the test's own `test.step` groups appear: as Section headings
+   * (`sections`, default), each collapsed into one QA Step (`collapse`), or
+   * not at all (`ignore`).
+   */
+  testSteps?: SectionPresentation;
 };
 
 /**
@@ -29,6 +36,7 @@ export type QaInstructionsReporterOptions = {
 export default class QaInstructionsReporter implements Reporter {
   private readonly outputDir: string;
   private readonly selection: TestSelection;
+  private readonly testSteps?: SectionPresentation;
 
   constructor(
     options: QaInstructionsReporterOptions = {},
@@ -36,6 +44,7 @@ export default class QaInstructionsReporter implements Reporter {
   ) {
     this.outputDir = options.outputDir ?? 'qa-runs';
     this.selection = new TestSelection(options.select);
+    this.testSteps = options.testSteps;
   }
 
   printsToStdio(): boolean {
@@ -46,7 +55,9 @@ export default class QaInstructionsReporter implements Reporter {
     try {
       if (!this.selection.includes(this.translator.testStart(test))) return;
 
-      const recorder = new QaInstructionsRecorder();
+      const recorder = new QaInstructionsRecorder({
+        sections: this.testSteps,
+      });
       for (const event of this.translator.translate(test, result)) {
         recorder.handle(event);
       }

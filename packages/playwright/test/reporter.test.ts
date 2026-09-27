@@ -7,7 +7,9 @@ import test from 'node:test';
 import type { TestCase, TestResult, TestStep } from '@playwright/test/reporter';
 import type { QaRunBundle } from '@qa-instructions/core';
 
-import QaInstructionsReporter from '../src/reporter/index.js';
+import QaInstructionsReporter, {
+  type QaInstructionsReporterOptions,
+} from '../src/reporter/index.js';
 
 type StepSpec = {
   category: string;
@@ -38,10 +40,13 @@ function mockTestCase(tags: string[] = []): TestCase {
   } as unknown as TestCase;
 }
 
-async function runReporter(steps: StepSpec[]): Promise<QaRunBundle> {
+async function runReporter(
+  steps: StepSpec[],
+  options: QaInstructionsReporterOptions = {},
+): Promise<QaRunBundle> {
   const out = await mkdtemp(path.join(tmpdir(), 'qa-reporter-'));
   try {
-    const reporter = new QaInstructionsReporter({ outputDir: out });
+    const reporter = new QaInstructionsReporter({ ...options, outputDir: out });
     await reporter.onTestEnd(mockTestCase(), {
       status: 'passed',
       retry: 0,
@@ -234,6 +239,70 @@ test('reporter selects tests by the test file Playwright reports', async () => {
   assert.deepEqual(
     await bundleDirsAfterRun({ select: { files: ['**/cart/**'] } }, []),
     [],
+  );
+});
+
+const groupedSteps: StepSpec[] = [
+  {
+    category: 'hook',
+    title: 'Before Hooks',
+    steps: [
+      {
+        category: 'fixture',
+        title: 'Fixture "page"',
+        steps: [{ category: 'pw:api', title: 'Create page' }],
+      },
+    ],
+  },
+  {
+    category: 'test.step',
+    title: 'Open the sign-in form',
+    steps: [
+      { category: 'pw:api', title: 'Navigate', params: { url: '/login' } },
+      {
+        category: 'test.step',
+        title: 'Enter credentials',
+        steps: [
+          {
+            category: 'pw:api',
+            title: 'Fill "demo-user"',
+            params: { locator: "getByLabel('Username')", value: 'demo-user' },
+          },
+        ],
+      },
+    ],
+  },
+  { category: 'pw:api', title: 'Reload' },
+];
+
+const sectionsOf = (bundle: QaRunBundle) =>
+  bundle.steps.map(({ action, section }) => ({ action, section }));
+
+test('reporter turns test.step groups into Sections by default', async () => {
+  assert.deepEqual(sectionsOf(await runReporter(groupedSteps)), [
+    {
+      action: 'Open http://127.0.0.1:4321/login',
+      section: ['Open the sign-in form'],
+    },
+    {
+      action: 'Type **demo-user** into **Username**',
+      section: ['Open the sign-in form', 'Enter credentials'],
+    },
+    { action: 'Reload the page', section: undefined },
+  ]);
+});
+
+test('reporter passes the testSteps presentation option to the core', async () => {
+  assert.deepEqual(
+    sectionsOf(await runReporter(groupedSteps, { testSteps: 'collapse' })),
+    [
+      { action: 'Open the sign-in form', section: undefined },
+      { action: 'Reload the page', section: undefined },
+    ],
+  );
+  assert.equal(
+    (await runReporter(groupedSteps, { testSteps: 'ignore' })).steps.length,
+    3,
   );
 });
 

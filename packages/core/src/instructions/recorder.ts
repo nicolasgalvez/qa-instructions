@@ -31,23 +31,48 @@ const USER_ACTIONS: ReadonlySet<ActionKind> = new Set<UserActionKind>([
   'reload',
 ]);
 
+/**
+ * How the test's own groups (e.g. Playwright `test.step`) are presented:
+ * - `sections`: each group's title is a Section heading over its QA Steps.
+ * - `collapse`: each outermost group becomes one QA Step named after it.
+ * - `ignore`: groups are dropped and QA Steps are listed flat.
+ */
+export type SectionPresentation = 'sections' | 'collapse' | 'ignore';
+
+export type QaInstructionsRecorderOptions = {
+  phraser?: StepPhraser;
+  /** Default `sections`. */
+  sections?: SectionPresentation;
+};
+
 type PendingStep = {
   action: string;
   url?: string;
+  section?: string[];
   expectedResults: string[];
 };
 
 /**
  * Consumes one test's neutral event stream and produces its QA Instructions:
  * a QA Step per user Action, with the checks that follow it as the step's
- * Expected Result. Test plumbing is dropped.
+ * Expected Result, grouped into Sections by the test's own groups. Test
+ * plumbing is dropped.
  */
 export class QaInstructionsRecorder implements TestEventSink {
   private readonly steps: PendingStep[] = [];
+  private readonly phraser: StepPhraser;
+  private readonly presentation: SectionPresentation;
+  /** Titles of the open groups, outermost first. */
+  private readonly groups: string[] = [];
+  /** The QA Step the open outermost group collapsed into, once it has one. */
+  private collapsedStep?: PendingStep;
   private start?: TestStartEvent;
   private end?: TestEndEvent;
 
-  constructor(private readonly phraser: StepPhraser = new StepPhraser()) {}
+  constructor(options: QaInstructionsRecorderOptions = {}) {
+    this.phraser = options.phraser ?? new StepPhraser();
+    this.presentation = options.sections ?? 'sections';
+  }
 
   handle(event: TestEvent): void {
     switch (event.type) {
@@ -59,6 +84,13 @@ export class QaInstructionsRecorder implements TestEventSink {
         break;
       case 'check':
         this.onCheck(event);
+        break;
+      case 'groupStart':
+        if (this.groups.length === 0) this.collapsedStep = undefined;
+        this.groups.push(event.title);
+        break;
+      case 'groupEnd':
+        this.groups.pop();
         break;
       case 'testEnd':
         this.end = event;
@@ -91,6 +123,7 @@ export class QaInstructionsRecorder implements TestEventSink {
         action: step.action,
         url: step.url,
         expected: this.expectedResult(step.expectedResults),
+        section: step.section,
       });
     }
     return builder.toBundle();
@@ -101,11 +134,32 @@ export class QaInstructionsRecorder implements TestEventSink {
 
     const url =
       event.kind === 'navigate' ? this.resolveUrl(event.url) : undefined;
+    if (this.presentation === 'collapse' && this.groups.length > 0) {
+      this.collapseInto(this.groups[0], url);
+      return;
+    }
     this.steps.push({
       action: this.phraser.action(event, url),
       url,
+      section: this.currentSection(),
       expectedResults: [],
     });
+  }
+
+  /** Folds an Action into the one QA Step named after its outermost group. */
+  private collapseInto(title: string, url: string | undefined): void {
+    if (!this.collapsedStep) {
+      this.collapsedStep = { action: title, expectedResults: [] };
+      this.steps.push(this.collapsedStep);
+    }
+    this.collapsedStep.url ??= url;
+  }
+
+  private currentSection(): string[] | undefined {
+    if (this.presentation !== 'sections' || this.groups.length === 0) {
+      return undefined;
+    }
+    return [...this.groups];
   }
 
   private onCheck(event: CheckEvent): void {

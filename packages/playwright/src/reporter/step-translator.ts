@@ -106,9 +106,15 @@ export class PlaywrightStepTranslator {
           const check = this.check(step);
           return check ? [check] : [];
         }
+        case 'test.step':
+          return [
+            { type: 'groupStart', title: step.title },
+            ...this.translateSteps(step.steps),
+            { type: 'groupEnd', title: step.title },
+          ];
         default:
-          // test.step, hook, and fixture steps group the calls a test makes,
-          // including calls made inside helpers and user fixtures.
+          // Hook and fixture steps wrap the calls a test makes, including
+          // calls made inside helpers and user fixtures.
           return this.translateSteps(step.steps);
       }
     });

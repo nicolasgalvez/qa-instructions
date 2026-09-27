@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
-    "render": "node ../../packages/cli/dist/index.js render qa-runs --format qa-steps --out qa-steps-out",
+    "render": "node ../../packages/cli/dist/index.js render qa-runs --format qa-steps --out qa-steps-out && node ../../packages/cli/dist/index.js render qa-runs/collapse --format qa-steps --out qa-steps-out/collapse && node ../../packages/cli/dist/index.js render qa-runs/ignore --format qa-steps --out qa-steps-out/ignore",
     "verify": "node scripts/verify-run.mjs",
     "verify:update-goldens": "node scripts/update-goldens.mjs",
     "e2e:selection": "rm -rf qa-runs-selection && playwright test --config playwright.selection.config.ts && node scripts/verify-selection.mjs",

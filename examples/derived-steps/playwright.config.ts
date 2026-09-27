@@ -6,7 +6,16 @@ export default defineConfig({
   testDir: './tests',
   reporter: [
     ['list'],
+    // Default presentation of test.step groups: Sections.
     ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs' }],
+    [
+      '@qa-instructions/playwright/reporter',
+      { outputDir: 'qa-runs/collapse', testSteps: 'collapse' },
+    ],
+    [
+      '@qa-instructions/playwright/reporter',
+      { outputDir: 'qa-runs/ignore', testSteps: 'ignore' },
+    ],
   ],
   use: {
     baseURL,
