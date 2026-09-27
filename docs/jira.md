@@ -33,9 +33,11 @@
 
 The `.github/workflows/jira.yml` action:
 
-1. Syncs ticket metadata onto the PR (comment, labels) on every PR open/reopen.
+1. Syncs ticket metadata onto the PR (comment, labels) on every PR open/reopen, for every ticket referenced in the branch, title, commits, or body.
 2. Transitions to `QA` when a PR is opened or reopened.
 3. Transitions to `Done` when a PR is merged.
+
+Transitions apply only to the ticket named in the branch (`QI-NNN-…`). Other tickets mentioned in the PR get the comment but keep their status.
 
 ## Quick Reference
 
