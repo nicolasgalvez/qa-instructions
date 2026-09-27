@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
+import { fixtureOrigin } from '@qa-instructions/fixture-site/origin';
 
-const baseURL = 'http://127.0.0.1:4321';
+const baseURL = fixtureOrigin.url;
 
 export default defineConfig({
   testDir: './tests',

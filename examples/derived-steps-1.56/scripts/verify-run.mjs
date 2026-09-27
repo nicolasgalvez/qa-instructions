@@ -1,6 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
+import { fixtureOrigin } from '@qa-instructions/fixture-site/origin';
 import sharp from 'sharp';
 
 import { GOLDENS, derivedSteps, root } from './shared.mjs';
@@ -45,9 +46,8 @@ for (const name of GOLDENS) {
   );
   let actual;
   try {
-    actual = await readFile(
-      path.join(root, 'qa-steps-out', `${name}.txt`),
-      'utf8',
+    actual = fixtureOrigin.canonicalize(
+      await readFile(path.join(root, 'qa-steps-out', `${name}.txt`), 'utf8'),
     );
   } catch (error) {
     fail(`missing rendered output for ${name}: ${error.message}`);

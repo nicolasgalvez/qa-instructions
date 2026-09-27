@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { fixtureOrigin } from '@qa-instructions/fixture-site/origin';
+
 export const root = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   '..',
@@ -92,14 +94,17 @@ export const GOLDENS = [
 const DATA_URI = /data:image\/png;base64,[A-Za-z0-9+/=]+/g;
 
 /**
- * Rendered output as its golden stores it. Screenshot bytes can differ between
- * machines, so HTML goldens keep a placeholder for each embedded image; the
- * images themselves are checked against the bundle's assets instead.
+ * Rendered output as its golden stores it. Goldens name the fixture site on
+ * its canonical port, whatever FIXTURE_PORT the run used. Screenshot bytes can
+ * differ between machines, so HTML goldens keep a placeholder for each
+ * embedded image; the images themselves are checked against the bundle's
+ * assets instead.
  */
 export function normalizeRendered(file, content) {
+  const canonical = fixtureOrigin.canonicalize(content);
   return file.endsWith('.html')
-    ? content.replace(DATA_URI, 'data:image/png;base64,…')
-    : content;
+    ? canonical.replace(DATA_URI, 'data:image/png;base64,…')
+    : canonical;
 }
 
 /**

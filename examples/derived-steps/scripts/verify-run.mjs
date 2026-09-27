@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { fixtureOrigin } from '@qa-instructions/fixture-site/origin';
 import { PNG } from 'pngjs';
 
 import {
@@ -138,8 +139,9 @@ async function verifyBundleScreenshots(golden, bundleDirName) {
       fail(`${label}: missing`);
       continue;
     }
-    if (expected.action !== undefined && step.action !== expected.action) {
-      fail(`${label}: action "${step.action}", expected "${expected.action}"`);
+    const action = fixtureOrigin.canonicalize(step.action);
+    if (expected.action !== undefined && action !== expected.action) {
+      fail(`${label}: action "${action}", expected "${expected.action}"`);
     }
     if (step.assetIds?.length !== 1) {
       fail(`${label}: expected one Step Screenshot, got ${step.assetIds}`);
