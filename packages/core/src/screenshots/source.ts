@@ -59,6 +59,15 @@ export type RecordedRegion = {
   scope: boolean;
 };
 
+/**
+ * Collapsible sections of the page (e.g. `<details>`) a call opened or
+ * closed, each named by the heading a person sees on it.
+ */
+export type SectionChanges = {
+  opened: string[];
+  closed: string[];
+};
+
 /** What was captured for one Action. Any part may be missing. */
 export type ActionCapture = {
   /** The page around the Action, at each moment that was captured. */
@@ -82,6 +91,12 @@ export type ActionCapture = {
    * when the page was not recorded on both sides of the call.
    */
   pageChanged?: boolean;
+  /**
+   * The sections the call opened or closed, set only when that is all it
+   * changed on the page as recorded. Undefined when the change was anything
+   * else or was not recorded.
+   */
+  sectionChanges?: SectionChanges;
   /**
    * Whether the call's recorded options forced it past the runner's usual
    * checks, however the test built them. Undefined when not recorded.

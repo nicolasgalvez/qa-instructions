@@ -65,6 +65,22 @@ for (const [version, steps] of Object.entries(STEPS)) {
     );
   });
 
+  test(`Playwright ${version}: the trace names the collapsed sections a script opened`, async () => {
+    const source = await TraceScreenshotSource.open(steps.trace);
+    const sections = (ref: string) => source.capture(ref)?.sectionChanges;
+
+    assert.deepEqual(sections(steps.open), {
+      opened: ['Shipping'],
+      closed: [],
+    });
+    assert.equal(sections(steps.openAgain), undefined, 'nothing changed');
+    assert.equal(
+      sections(steps.showNote),
+      undefined,
+      'a change that is not a section opening or closing',
+    );
+  });
+
   test(`Playwright ${version}: the trace says which Actions were forced, however their options were built`, async () => {
     const source = await TraceScreenshotSource.open(steps.trace);
 
@@ -80,5 +96,6 @@ test('without DOM snapshots, the trace does not say whether a script changed the
     ActionRef.of(5, 'Fill "Ada"'),
   ]) {
     assert.equal(source.capture(ref)?.pageChanged, undefined);
+    assert.equal(source.capture(ref)?.sectionChanges, undefined);
   }
 });

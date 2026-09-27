@@ -163,6 +163,56 @@ test('a script that changed nothing does not split a collapsed group', () => {
   );
 });
 
+test('a script the recording says opened collapsed sections names each by its heading and says to click it open', () => {
+  const opened = (...names: string[]): ActionCapture => ({
+    ...changed,
+    sectionChanges: { opened: names, closed: [] },
+  });
+  assert.equal(
+    qaSteps(new RecordedFacts({ script: opened('Explore more categories') }), [
+      openSections,
+    ]),
+    '1. Warning: The test opened the **Explore more categories** section with a script instead of a user action. Click it to open it if it is closed.\n',
+  );
+  assert.equal(
+    qaSteps(
+      new RecordedFacts({ script: opened('Shipping', 'Returns', 'Contact') }),
+      [openSections],
+    ),
+    '1. Warning: The test opened the **Shipping**, **Returns**, and **Contact** sections with a script instead of a user action. Click each one to open it if it is closed.\n',
+  );
+});
+
+test('a script the recording says closed sections says to click them closed', () => {
+  assert.equal(
+    qaSteps(
+      new RecordedFacts({
+        script: {
+          ...changed,
+          sectionChanges: { opened: [], closed: ['Shipping', 'Returns'] },
+        },
+      }),
+      [openSections],
+    ),
+    '1. Warning: The test closed the **Shipping** and **Returns** sections with a script instead of a user action. Click each one to close it if it is open.\n',
+  );
+});
+
+test('a script that both opened and closed sections keeps the plain warning', () => {
+  assert.equal(
+    qaSteps(
+      new RecordedFacts({
+        script: {
+          ...changed,
+          sectionChanges: { opened: ['Shipping'], closed: ['Returns'] },
+        },
+      }),
+      [openSections],
+    ),
+    `1. ${WARNING}\n`,
+  );
+});
+
 test('the rule: what the recording says wins over what the test did with the result', () => {
   const rule = new ScriptChangeRule();
   const used = { ...openSections, resultUsed: true };

@@ -5,7 +5,7 @@ import type {
   ExpectedPattern,
   UserActionKind,
 } from '../events.js';
-import type { RecordedElement } from '../screenshots/source.js';
+import type { RecordedElement, SectionChanges } from '../screenshots/source.js';
 import { ElementNamer, ROLE_NOUNS, type ElementName } from './element-namer.js';
 import { RegionNamer } from './region-namer.js';
 
@@ -20,6 +20,8 @@ export type RecordedFacts = {
   /** The element was a password field. */
   password?: boolean;
   element?: RecordedElement;
+  /** The sections a script opened or closed, when that is all it changed. */
+  sections?: SectionChanges;
 };
 
 type CheckWording = { positive: string; negative: string };
@@ -191,9 +193,41 @@ export class StepPhraser {
       return `The test sent ${type} to ${target} ${byScript} ${byHand}`;
     }
 
+    const sections = recorded.sections;
+    // Only one way: a mix has no single thing to tell the tester to do.
+    if (
+      sections &&
+      (sections.opened.length === 0) !== (sections.closed.length === 0)
+    ) {
+      return this.sectionChange(sections, byScript);
+    }
     return touched
       ? `The test changed ${target} ${byScript} If the page does not match what comes next, change it by hand to continue.`
       : `The test changed the page ${byScript} ${byHand}`;
+  }
+
+  /**
+   * A script that only opened, or only closed, collapsible sections: each is
+   * named by its heading, and the tester clicks it into the same state.
+   */
+  private sectionChange(sections: SectionChanges, byScript: string): string {
+    const opened = sections.opened.length > 0;
+    const names = opened ? sections.opened : sections.closed;
+    const [verb, want, unless] = opened
+      ? ['opened', 'open', 'closed']
+      : ['closed', 'close', 'open'];
+    const several = names.length > 1;
+    return (
+      `The test ${verb} the ${this.list(names.map((n) => this.emphasize(n)))} ` +
+      `${several ? 'sections' : 'section'} ${byScript} ` +
+      `Click ${several ? 'each one' : 'it'} to ${want} it if it is ${unless}.`
+    );
+  }
+
+  /** Items joined as a person writes a list: `a`, `a and b`, `a, b, and c`. */
+  private list(items: string[]): string {
+    if (items.length <= 2) return items.join(' and ');
+    return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
   }
 
   /**

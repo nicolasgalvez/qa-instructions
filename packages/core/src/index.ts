@@ -11,6 +11,7 @@ export {
   type ActionCapture,
   type CheckCapture,
   type RecordedElement,
+  type SectionChanges,
   type RecordedRegion,
   type Screenshot,
   type ScreenshotSource,

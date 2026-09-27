@@ -300,7 +300,12 @@ export class QaInstructionsRecorder implements TestEventSink {
   private phrase(step: PendingStep, capture: ActionCapture | undefined) {
     if (typeof step.action === 'string') return step.action;
     const recorded = { element: capture?.element };
-    if (step.warning) return this.phraser.scriptChange(step.action, recorded);
+    if (step.warning) {
+      return this.phraser.scriptChange(step.action, {
+        ...recorded,
+        sections: capture?.sectionChanges,
+      });
+    }
     return this.phraser.action(step.action as UserActionEvent, step.url, {
       ...recorded,
       password: capture?.passwordField === true,
