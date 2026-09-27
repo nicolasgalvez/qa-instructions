@@ -15,7 +15,13 @@ export default defineConfig({
     ],
   ],
   projects: [
-    { name: 'steps', testDir: './tests' },
+    {
+      name: 'steps',
+      testDir: './tests',
+      // The cart test's trace is kept as traces/v8-checks.zip; the adapter
+      // reads only its events.
+      use: { trace: { mode: 'on', sources: false, screenshots: false } },
+    },
     {
       // The trace adapter's sample scenario, recorded as trace format 8.
       name: 'trace',

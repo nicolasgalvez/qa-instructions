@@ -56,6 +56,8 @@ async function bundleFrom(
   version: string,
   recording: string,
   rewrite: (step: DumpedStep) => DumpedStep = (step) => step,
+  /** The trace recorded with the steps, if the test should have one. */
+  trace?: string,
 ): Promise<QaRunBundle> {
   const recorded = JSON.parse(
     await readFile(path.join(STEPS, version, `${recording}.json`), 'utf8'),
@@ -84,7 +86,9 @@ async function bundleFrom(
       {
         status: 'passed',
         retry: 0,
-        attachments: [],
+        attachments: trace
+          ? [{ name: 'trace', path: trace, contentType: 'application/zip' }]
+          : [],
         steps: dump.steps.map(toStep),
       } as unknown as TestResult,
     );
@@ -116,7 +120,6 @@ for (const recording of [
   'sign-in-with-good-credentials',
   'read-the-faq',
   'subscribe-to-the-newsletter',
-  'add-credits-to-the-cart',
 ]) {
   test(`Playwright 1.56 yields the same QA Steps as 1.63: ${recording}`, async () => {
     assert.deepEqual(
@@ -125,6 +128,28 @@ for (const recording of [
     );
   });
 }
+
+/** The cart test's 1.56 trace, recorded with its steps. */
+const CART_TRACE = fileURLToPath(
+  new URL('../../test/fixtures/traces/v8-checks.zip', import.meta.url),
+);
+
+test('Playwright 1.56 with a trace reads checks on variables and computed values as 1.63 does', async () => {
+  const cart = 'add-credits-to-the-cart';
+  assert.deepEqual(
+    qaSteps(await bundleFrom('1.56', cart, undefined, CART_TRACE)),
+    qaSteps(await bundleFrom('1.63', cart)),
+  );
+});
+
+test('Playwright 1.56 without a trace reads checks from the source only, as before', async () => {
+  const steps = qaSteps(await bundleFrom('1.56', 'add-credits-to-the-cart'));
+  // `expect(qtyInput).toHaveValue(String(QTY))`: neither the element nor
+  // the value is written in the source.
+  assert.equal(steps[1].expected, undefined);
+  // `toBeCloseTo(QTY * UNIT_PRICE, 2)`: a computed value.
+  assert.equal(steps[3].expected, '**cart line-item quantity** is **3**');
+});
 
 test("checks titled with the author's message are Expected Results named by the message", async () => {
   const bundle = await bundleFrom('1.63', 'add-credits-to-the-cart');
@@ -138,7 +163,7 @@ test("checks titled with the author's message are Expected Results named by the 
       {
         action:
           'Type **3** into the **input[name="download_quantity"]** element',
-        expected: undefined,
+        expected: 'The **input[name="download_quantity"]** element shows **3**',
       },
       {
         action: 'Click the **Purchase** button',

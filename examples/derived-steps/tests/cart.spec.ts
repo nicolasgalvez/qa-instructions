@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 
-// Written like a real store's cart test: checks carry messages, and the
-// cart's state is read into variables before it is checked.
+// Written like a real store's cart test: checks carry messages, name
+// elements by variables, expect computed values, and the cart's state is
+// read into variables before it is checked.
 
 const QTY = 3;
-const SUBTOTAL = 15;
+const UNIT_PRICE = 5;
 
 test('Add credits to the cart', async ({ page }) => {
   await page.goto('/shop');
@@ -15,6 +16,7 @@ test('Add credits to the cart', async ({ page }) => {
 
   const qtyInput = form.locator('input[name="download_quantity"]');
   await qtyInput.fill(String(QTY));
+  await expect(qtyInput).toHaveValue(String(QTY));
   await form.getByRole('button', { name: 'Purchase' }).click();
   await expect(page.getByText('Added to cart'), 'added message').toBeVisible();
 
@@ -30,7 +32,7 @@ test('Add credits to the cart', async ({ page }) => {
 
   expect(cartQty, 'cart line-item quantity').toBe(QTY);
   expect(cartSubtotal, 'cart subtotal (qty × unit price)').toBeCloseTo(
-    SUBTOTAL,
+    QTY * UNIT_PRICE,
     2,
   );
 });

@@ -95,6 +95,9 @@ export type ActionEvent = {
   ref?: string;
 };
 
+/** A regular expression the checked text must match, e.g. `/login-error/`. */
+export type ExpectedPattern = { source: string; flags: string };
+
 export type CheckEvent = {
   type: 'check';
   /** Matcher name without negation, e.g. `toBeVisible`. */
@@ -105,6 +108,8 @@ export type CheckEvent = {
   target?: ElementTarget;
   /** The expected value, when the runner reports one a person can read. */
   expected?: string;
+  /** The pattern the checked text must match, when the check expects one. */
+  expectedPattern?: ExpectedPattern;
   /**
    * The test author's own words for what is checked, e.g.
    * `cart line-item quantity` in Playwright's `expect(qty, 'cart line-item quantity')`.
@@ -112,6 +117,11 @@ export type CheckEvent = {
   description?: string;
   /** True when this check is where the test failed. */
   failed?: boolean;
+  /**
+   * The runner adapter's own reference to this check, opaque to the core.
+   * The ScreenshotSource may know what the check checked by it.
+   */
+  ref?: string;
 };
 
 export type TestEndEvent = {

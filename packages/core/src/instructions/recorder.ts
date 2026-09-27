@@ -88,7 +88,11 @@ type PendingStep = {
   action: string | UserActionEvent;
   url?: string;
   section?: string[];
-  expectedResults: string[];
+  /**
+   * The checks that follow the Action, phrased as its Expected Result once
+   * the screenshot source has filled in what they checked.
+   */
+  checks: CheckEvent[];
   failed?: boolean;
   warning?: boolean;
   approximate?: boolean;
@@ -205,12 +209,14 @@ export class QaInstructionsRecorder implements TestEventSink {
       const screenshot = this.picker.pick(capture?.screenshots ?? []);
       const asset = screenshot && this.screenshotAsset(i + 1, screenshot);
       if (asset) builder.addAsset(asset);
+      const checks = this.seenChecks(step.checks, screenshots);
       builder.addStep({
         action: this.phrase(step, capture),
         url: step.url,
-        expected: this.expectedResult(step.expectedResults),
+        expected: this.expectedResult(checks.map(({ phrase }) => phrase)),
         section: step.section,
-        failed: step.failed,
+        failed:
+          step.failed ?? (checks.some(({ failed }) => failed) || undefined),
         warning: step.warning,
         approximate: step.approximate,
         ...this.captureFields(capture, screenshot, asset),
@@ -262,7 +268,7 @@ export class QaInstructionsRecorder implements TestEventSink {
       action: event,
       url,
       section: this.currentSection(),
-      expectedResults: [],
+      checks: [],
       failed: event.failed,
       approximate: event.forced === true,
       ref: event.ref,
@@ -280,7 +286,7 @@ export class QaInstructionsRecorder implements TestEventSink {
     this.steps.push({
       action: this.phraser.scriptChange(event),
       section: this.currentSection(),
-      expectedResults: [],
+      checks: [],
       warning: true,
       ref: event.ref,
     });
@@ -296,7 +302,7 @@ export class QaInstructionsRecorder implements TestEventSink {
     event: ActionEvent,
   ): void {
     if (!this.collapsedStep) {
-      this.collapsedStep = { action: title, expectedResults: [] };
+      this.collapsedStep = { action: title, checks: [] };
       this.steps.push(this.collapsedStep);
     }
     this.collapsedStep.url ??= url;
@@ -312,13 +318,40 @@ export class QaInstructionsRecorder implements TestEventSink {
   }
 
   private onCheck(event: CheckEvent): void {
-    const current = this.steps.at(-1);
-    if (!current) return;
+    this.steps.at(-1)?.checks.push(event);
+  }
 
-    const phrase = this.phraser.check(event);
-    if (!phrase) return;
-    current.expectedResults.push(phrase);
-    if (event.failed) current.failed = true;
+  /**
+   * The checks a tester can see, phrased, after filling in from the source
+   * what the runner did not report (the element checked, the value
+   * expected). What the runner reported wins.
+   */
+  private seenChecks(
+    checks: CheckEvent[],
+    source: ScreenshotSource,
+  ): { phrase: string; failed?: boolean }[] {
+    return checks.flatMap((event) => {
+      const phrase = this.phraser.check(this.completed(event, source));
+      return phrase ? [{ phrase, failed: event.failed }] : [];
+    });
+  }
+
+  private completed(event: CheckEvent, source: ScreenshotSource): CheckEvent {
+    const recorded =
+      event.ref === undefined ? undefined : source.check?.(event.ref);
+    if (!recorded) return event;
+    const expectsSomething =
+      event.expected !== undefined || event.expectedPattern !== undefined;
+    return {
+      ...event,
+      target: event.target ?? recorded.target,
+      ...(expectsSomething
+        ? {}
+        : {
+            expected: recorded.expected,
+            expectedPattern: recorded.expectedPattern,
+          }),
+    };
   }
 
   private isUserAction(

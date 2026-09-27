@@ -46,7 +46,7 @@
       },
       "location": {
         "file": "cart.spec.ts",
-        "line": 10,
+        "line": 11,
         "column": 14
       }
     },
@@ -59,7 +59,7 @@
       },
       "location": {
         "file": "cart.spec.ts",
-        "line": 14,
+        "line": 15,
         "column": 56
       }
     },
@@ -73,8 +73,22 @@
       },
       "location": {
         "file": "cart.spec.ts",
-        "line": 17,
+        "line": 18,
         "column": 18
+      }
+    },
+    {
+      "title": "Expect \"toHaveValue\"",
+      "category": "expect",
+      "subtitle": "locator('#purchase_1174').locator('input[name=\"download_quantity\"]')",
+      "params": {
+        "locator": "locator('#purchase_1174').locator('input[name=\"download_quantity\"]')",
+        "expected": "3"
+      },
+      "location": {
+        "file": "cart.spec.ts",
+        "line": 19,
+        "column": 26
       }
     },
     {
@@ -86,7 +100,7 @@
       },
       "location": {
         "file": "cart.spec.ts",
-        "line": 18,
+        "line": 20,
         "column": 56
       }
     },
@@ -99,7 +113,7 @@
       },
       "location": {
         "file": "cart.spec.ts",
-        "line": 19,
+        "line": 21,
         "column": 66
       }
     },
@@ -112,7 +126,7 @@
       },
       "location": {
         "file": "cart.spec.ts",
-        "line": 21,
+        "line": 23,
         "column": 14
       }
     },
@@ -124,7 +138,7 @@
       },
       "location": {
         "file": "cart.spec.ts",
-        "line": 31,
+        "line": 33,
         "column": 46
       }
     },
@@ -136,7 +150,7 @@
       },
       "location": {
         "file": "cart.spec.ts",
-        "line": 32,
+        "line": 34,
         "column": 60
       }
     },

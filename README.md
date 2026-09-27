@@ -157,12 +157,12 @@ Masking covers text only. Password fields already show as dots in Step Screensho
 
 Requires `@playwright/test` 1.53 or later.
 
-| Playwright | Step details                                     | Step Screenshots                                                 | Trace setting                                                            |
-| ---------- | ------------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 1.63+      | Step data (`subtitle`, `params`)                 | One full-size screenshot per Action, element box and click point | `use: { trace: { mode: 'on', snapshots: { screen: true, dom: true } } }` |
-| 1.53–1.62  | Step titles, plus each check's line in your test | A frame of the screen recording per Action; click point          | `use: { trace: 'on' }`                                                   |
+| Playwright | Step details                                               | Step Screenshots                                                 | Trace setting                                                            |
+| ---------- | ---------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1.63+      | Step data (`subtitle`, `params`)                           | One full-size screenshot per Action, element box and click point | `use: { trace: { mode: 'on', snapshots: { screen: true, dom: true } } }` |
+| 1.53–1.62  | Step titles, each check's line in your test, and the trace | A frame of the screen recording per Action; click point          | `use: { trace: 'on' }`                                                   |
 
-On 1.53–1.62 the QA Steps and Expected Results read the same as on 1.63; screenshots are rougher (recorded JPEG frames, and no element box, so no outline). A click gets the frame drawn at the moment it was made, with its click point marked, when the recording has one from no more than 50ms before; any other Action, or a click without such a frame, gets the frame from when it ended, unmarked. Two limits there: a check whose subject is a variable (`expect(button).toBeVisible()`) has no element to name unless the check has a message, and a navigation to an absolute URL held in a variable keeps only its path. Traces in formats other than 8, 9, and 10 give text-only QA Instructions and a warning.
+On 1.53–1.62 the QA Steps and Expected Results read the same as on 1.63; screenshots are rougher (recorded JPEG frames, and no element box, so no outline). A click gets the frame drawn at the moment it was made, with its click point marked, when the recording has one from no more than 50ms before; any other Action, or a click without such a frame, gets the frame from when it ended, unmarked. A check on an element held in a variable (`expect(qtyInput).toHaveValue(String(QTY))`) names the element and the value the trace recorded, as on 1.63. Without a trace, checks are read from your test's source alone: an element held in a variable has no name unless the check has a message, and an expected value is read only when written as a literal or a constant (`toBe(QTY)`, not `toBe(QTY * PRICE)`). One limit remains: a navigation to an absolute URL held in a variable keeps only its path. Traces in formats other than 8, 9, and 10 give text-only QA Instructions and a warning.
 
 ## What you get
 
@@ -170,11 +170,13 @@ Each test's browser Actions (opening a URL, clicking, typing, pressing keys, cho
 
 A check's message names what it checks. `expect(cartQty, 'cart line-item quantity').toBe(3)` reads "**cart line-item quantity** is **3**", so a value the test read from the page still tells the tester what to look for; a value checked without a message is left out. On an element, the message is used only when the element has no readable name (a CSS selector, or a role without a name): `expect(form, 'purchase form').toBeVisible()` on `locator('#purchase_1174')` reads "**purchase form** is visible".
 
+A check against a regular expression needs the trace, which records the pattern. Plain text reads as what must appear (`toHaveURL(/login-error/)`: "The page address contains **login-error**"); any other pattern is shown as written ("matches **/^\/orders\/\d+$/**").
+
 ```
 1. Open http://127.0.0.1:4321/ — The **Fixture App** heading is visible
 2. Click the **Sign in** link — The page title is **Sign in**; **Username** is empty
 3. Type **demo-user** into **Username**
-4. Click the **Submit bad credentials** button — **Invalid credentials** is visible; the **Login failed** heading is visible
+4. Click the **Submit bad credentials** button — The page address contains **login-error**; **Invalid credentials** is visible; the **Login failed** heading is visible
 5. Press **Tab**
 ```
 

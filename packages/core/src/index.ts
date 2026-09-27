@@ -9,6 +9,7 @@ export {
 export {
   NoScreenshots,
   type ActionCapture,
+  type CheckCapture,
   type Screenshot,
   type ScreenshotSource,
 } from './screenshots/source.js';

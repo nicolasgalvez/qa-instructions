@@ -5,6 +5,7 @@
  * for an Action by the Action's `ref`. Nothing here may depend on a test
  * runner's or trace format's types.
  */
+import type { ElementTarget, ExpectedPattern } from '../events.js';
 import type { QaBox, QaPoint, QaScreenshotMoment, QaSize } from '../model.js';
 
 export type Screenshot = {
@@ -30,14 +31,31 @@ export type ActionCapture = {
   viewport?: QaSize;
 };
 
+/**
+ * What was recorded for one check (e.g. in a trace): the element it
+ * checked and the value it expected. Fills in what the runner's own step
+ * data did not say. Any part may be missing.
+ */
+export type CheckCapture = {
+  target?: ElementTarget;
+  expected?: string;
+  expectedPattern?: ExpectedPattern;
+};
+
 export interface ScreenshotSource {
   /** What was captured for the Action with this ref, if anything. */
   capture(ref: string): ActionCapture | undefined;
+  /** What was recorded for the check with this ref, if anything. */
+  check?(ref: string): CheckCapture | undefined;
 }
 
 /** A source with no screenshots: QA Instructions are text only. */
 export class NoScreenshots implements ScreenshotSource {
   capture(): undefined {
+    return undefined;
+  }
+
+  check(): undefined {
     return undefined;
   }
 }

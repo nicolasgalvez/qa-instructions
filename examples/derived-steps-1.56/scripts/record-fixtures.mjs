@@ -9,6 +9,8 @@ import { SPECS, derivedSteps, root, syncSpecs } from './shared.mjs';
 //   steps/1.56/*.json, steps/1.63/*.json  reporter steps per test
 //   steps/*.spec.ts                       the sources those steps point at
 //   traces/v8.zip                         the sample scenario's 1.56 trace
+//   traces/v8-checks.zip                  the cart test's 1.56 trace, whose
+//                                         checks the steps do not describe
 
 const fixtures = path.join(
   root,
@@ -61,12 +63,16 @@ for (const spec of SPECS) {
 }
 
 const traceDir = path.join(root, 'test-results', 'record');
-const [recorded] = (await readdir(traceDir)).filter((d) =>
-  d.startsWith('scenario-'),
-);
-await copyFile(
-  path.join(traceDir, recorded, 'trace.zip'),
-  path.join(fixtures, 'traces', 'v8.zip'),
-);
+const recordedTraces = await readdir(traceDir);
+for (const [prefix, fixture] of [
+  ['scenario-', 'v8.zip'],
+  ['cart-', 'v8-checks.zip'],
+]) {
+  const recorded = recordedTraces.find((d) => d.startsWith(prefix));
+  await copyFile(
+    path.join(traceDir, recorded, 'trace.zip'),
+    path.join(fixtures, 'traces', fixture),
+  );
+}
 
 console.log('record-fixtures: ok');
