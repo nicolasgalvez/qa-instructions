@@ -1,0 +1,84 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Order">
+  <h1>Order</h1>
+  <p>Two products, one far below the other: a test must scroll to reach the second.</p>
+
+  <section class="product" id="rain-jacket">
+    <h2>Rain jacket</h2>
+    <label>
+      Rain jacket quantity
+      <input name="rain-jacket" type="number" value="1" />
+    </label>
+  </section>
+
+  <div class="spacer" aria-hidden="true"></div>
+
+  <section class="product far" id="trail-boots">
+    <h2>Trail boots</h2>
+    <label>
+      Trail boots quantity
+      <input name="trail-boots" type="number" value="1" />
+    </label>
+    <button type="button" class="add" id="add-boots" aria-label="Add Trail boots to cart">
+      Add to cart
+    </button>
+    <p id="added" hidden>Added <span id="added-quantity"></span> Trail boots to the cart</p>
+  </section>
+
+  <div class="spacer" aria-hidden="true"></div>
+
+  <style>
+    :global(html) {
+      scroll-behavior: auto;
+    }
+    .spacer {
+      height: 1600px;
+    }
+    .product {
+      padding: 16px;
+    }
+    .far {
+      background: #ffd400;
+    }
+    .product input {
+      display: block;
+      width: 120px;
+      margin-top: 8px;
+      padding: 8px;
+      border: 2px solid #111;
+      font: inherit;
+    }
+    /* A changed quantity turns green, so a screenshot shows the typed value. */
+    .product input.changed {
+      background: #19a974;
+    }
+    .add {
+      margin-top: 16px;
+      width: 240px;
+      padding: 16px;
+      border: none;
+      background: #1f4fd8;
+      color: #fff;
+      font: inherit;
+      cursor: pointer;
+    }
+    /* Clicked: the button turns gray, so a screenshot taken after the click shows it. */
+    .add.done {
+      background: #888888;
+    }
+  </style>
+  <script is:inline>
+    for (const input of document.querySelectorAll('.product input')) {
+      input.addEventListener('input', () => input.classList.add('changed'));
+    }
+    const add = document.getElementById('add-boots');
+    add.addEventListener('click', () => {
+      add.classList.add('done');
+      document.getElementById('added-quantity').textContent =
+        document.querySelector('input[name="trail-boots"]').value;
+      document.getElementById('added').hidden = false;
+    });
+  </script>
+</Base>

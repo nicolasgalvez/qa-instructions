@@ -8,6 +8,7 @@ import test from 'node:test';
 import type { ActionCapture, Screenshot } from '@qa-instructions/core';
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { PNG } from 'pngjs';
+import sharp from 'sharp';
 
 import { ActionRef } from '../src/reporter/action-ref.js';
 import { TraceScreenshotSource } from '../src/reporter/trace-screenshot-source.js';
@@ -233,17 +234,20 @@ async function v8Frames(): Promise<Buffer[]> {
     .map((name) => Buffer.from(entries[name]));
 }
 
-test('trace format 8: an Action that touched no point gets the screen recording frame nearest its end', async () => {
+test('trace format 8: an Action that touched no point gets a screen recording frame from after its end', async () => {
   const source = await TraceScreenshotSource.open(fixture('v8.zip'));
   assert.equal(source.problem, undefined);
   const frames = await v8Frames();
   assert.equal(frames.length, 4);
 
   for (const [ref, frame] of [
-    // Navigation ends before the first frame is painted: the next frame.
-    [V8.NAVIGATE, 0],
-    // Otherwise the last frame painted by the time the Action ended.
-    [V8.FILL, 2],
+    // The last frame painted after the Action ended and before the next
+    // Action began changing the page: for the navigation, the loaded page
+    // (frame 0 is the blank page before it); for the fill, "Ada" typed
+    // (frame 2, painted during the fill, shows the field still empty).
+    [V8.NAVIGATE, 1],
+    [V8.FILL, 3],
+    // No frame was painted after the key press: the last one by its end.
     [V8.PRESS, 3],
   ] as const) {
     const screenshots = source.capture(ref)?.screenshots ?? [];
@@ -267,7 +271,7 @@ test('trace format 8 as Playwright 1.53–1.54 write it (every step method "step
   );
   const source = await openEntries(entries);
   const frames = await v8Frames();
-  assert.ok(source.capture(V8.FILL)?.screenshots[0].data.equals(frames[2]));
+  assert.ok(source.capture(V8.FILL)?.screenshots[0].data.equals(frames[3]));
   assert.deepEqual(source.capture(V8.CLICK)?.point, { x: 100, y: 60 });
 });
 
@@ -280,7 +284,11 @@ test('trace format 8: the click point comes from the trace, with no element box'
 /**
  * The v8 sample with its library trace rewritten. In it the click's input
  * snapshot is taken at 2436.618 and the recording's frames arrive at
- * 2332.608, 2360.165, 2390.372, and 2401.415 (frames 0–3).
+ * 2332.608, 2360.165, 2390.372, and 2401.415 (frames 0–3), having been
+ * painted about 1–4ms earlier (their `frameSwapWallTime`, on the wall clock
+ * the context options pair with the trace's clock: frame 3 at 2399.848).
+ * The fill's typed value is first recorded by its `after` snapshot, at
+ * 2394.213.
  */
 async function v8With(
   edit: (libraryTrace: string) => string,
@@ -305,10 +313,10 @@ test('trace format 8: a click gets the frame drawn at the moment of the Action',
 });
 
 test('trace format 8: the moment-of-Action frame is the last one drawn before the input, never one after it', async () => {
-  // Input at 2400.000: frame 3 (2401.415) is nearer but arrived after it,
-  // when the click may already have changed the page.
+  // Input at 2399.000: frame 3 (painted 2399.848) is nearer but was painted
+  // after it, when the click may already have changed the page.
   const source = await v8With((trace) =>
-    trace.replace('"timestamp":2436.618', '"timestamp":2400.000'),
+    trace.replace('"timestamp":2436.618', '"timestamp":2399.000'),
   );
   const frames = await v8Frames();
   const screenshots = source.capture(V8.CLICK)?.screenshots ?? [];
@@ -320,8 +328,9 @@ test('trace format 8: the moment-of-Action frame is the last one drawn before th
 });
 
 test('trace format 8: with no frame drawn just before the input, a click keeps the frame from its end, unmarked', async () => {
-  // Input at 2461.618: the last frame (3) arrived 60ms earlier, so the page
-  // may have changed since without the recording showing it yet.
+  // Input at 2461.618: the last frame (3) was painted 62ms earlier, only 6ms
+  // after the fill changed the page, so it may not show the page as it was
+  // by the input, and the recording can go quiet while the page changes.
   const source = await v8With((trace) =>
     trace
       .replace('"timestamp":2436.618', '"timestamp":2461.618')
@@ -349,6 +358,143 @@ test('trace format 8: without the input snapshot the moment of the Action is unk
     (source.capture(V8.CLICK)?.screenshots ?? []).map((s) => s.moment),
     ['after'],
   );
+});
+
+test('trace format 8: an old frame painted well after the page last changed still shows the moment of a click', async () => {
+  // Frame 3 moved to 2455.000, 61ms after the fill's value was recorded, and
+  // the input to 2520.000: the frame is 65ms old, but the page (DOM, form
+  // values, scroll offsets) was the same from before it was painted until
+  // the input.
+  const source = await v8With((trace) =>
+    trace
+      .replace(
+        '"timestamp":2401.415,"frameSwapWallTime":1790470191121.614',
+        '"timestamp":2456.000,"frameSwapWallTime":1790470191176.766',
+      )
+      .replace('"timestamp":2436.618', '"timestamp":2520.000')
+      .replace('"endTime":2444.709', '"endTime":2528.000'),
+  );
+  const frames = await v8Frames();
+  const screenshots = source.capture(V8.CLICK)?.screenshots ?? [];
+  assert.deepEqual(
+    screenshots.map((s) => s.moment),
+    ['action'],
+  );
+  assert.ok(screenshots[0].data.equals(frames[3]));
+});
+
+/**
+ * Trace format 8 of a long page (fixtures/traces/scroll.spec.ts, Playwright
+ * 1.56): the fill and the Far click make Playwright scroll; the Add click
+ * does not. Viewport 400×300; frames are 400×300 JPEGs.
+ */
+const V8_SCROLL = {
+  FILL: ActionRef.of(5, `Fill "3" getByLabel('Quantity')`),
+  ADD: ActionRef.of(7, `Click getByRole('button', { name: 'Add' })`),
+  FAR: ActionRef.of(8, `Click getByRole('button', { name: 'Far' })`),
+};
+
+const SCROLL_PAGE = {
+  yellowBand: { r: 0xff, g: 0xd4, b: 0x00 },
+  typedField: { r: 0x00, g: 0x00, b: 0xcc },
+  button: { r: 0x1f, g: 0x4f, b: 0xd8 },
+  clickedButton: { r: 0xcc, g: 0x00, b: 0x00 },
+};
+
+async function jpegPixel(screenshot: Screenshot, x: number, y: number) {
+  const { data, info } = await sharp(screenshot.data)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const i = (info.width * y + x) * info.channels;
+  return { r: data[i], g: data[i + 1], b: data[i + 2] };
+}
+
+/** Within JPEG noise of `expected`. */
+function assertColor(
+  actual: { r: number; g: number; b: number },
+  expected: { r: number; g: number; b: number },
+  what: string,
+) {
+  const off = Math.max(
+    Math.abs(actual.r - expected.r),
+    Math.abs(actual.g - expected.g),
+    Math.abs(actual.b - expected.b),
+  );
+  assert.ok(
+    off <= 40,
+    `${what}: rgb(${actual.r},${actual.g},${actual.b}), expected rgb(${expected.r},${expected.g},${expected.b})`,
+  );
+}
+
+test('trace format 8: a click Playwright scrolled to just before the input is unmarked, on a frame showing its result', async () => {
+  const source = await TraceScreenshotSource.open(fixture('v8-scroll.zip'));
+  const far = source.capture(V8_SCROLL.FAR);
+  assert.deepEqual(far?.point, { x: 80, y: 150 });
+  // The frame painted 0.7ms before the input still shows the page before
+  // the scroll, so no frame shows the moment of the click.
+  assert.deepEqual(moments(far), ['after']);
+  // The frame from after it shows the page scrolled to Far, clicked (probed
+  // beside its label, which is at the click point).
+  assertColor(
+    await jpegPixel(shot(far, 'after'), 20, 140),
+    SCROLL_PAGE.clickedButton,
+    'Far next to the click point',
+  );
+});
+
+test('trace format 8: a click on a page that had scrolled earlier is marked, on a frame showing the scroll', async () => {
+  const source = await TraceScreenshotSource.open(fixture('v8-scroll.zip'));
+  const add = source.capture(V8_SCROLL.ADD);
+  assert.deepEqual(add?.point, { x: 100, y: 242 });
+  assert.deepEqual(moments(add), ['action']);
+  // Under the click point: the Add button, not yet clicked.
+  assertColor(
+    await jpegPixel(shot(add, 'action'), 100, 250),
+    SCROLL_PAGE.button,
+    'Add under the click point',
+  );
+});
+
+test('trace format 8: a fill that scrolls gets a frame showing the typed value where the field is', async () => {
+  const source = await TraceScreenshotSource.open(fixture('v8-scroll.zip'));
+  const fill = source.capture(V8_SCROLL.FILL);
+  assert.deepEqual(moments(fill), ['after']);
+  const frame = shot(fill, 'after');
+  assertColor(
+    await jpegPixel(frame, 300, 250),
+    SCROLL_PAGE.yellowBand,
+    'scrolled to the band',
+  );
+  assertColor(
+    await jpegPixel(frame, 150, 294),
+    SCROLL_PAGE.typedField,
+    'the typed field',
+  );
+});
+
+test('trace format 8: a click is never marked on a frame painted before the page reached its scroll position', async () => {
+  // Add's input moved to just after the fill: its scroll offsets were first
+  // recorded at 89.6ms into the run (the fill's `after` snapshot), and the
+  // last frame before this input was painted too soon after to show them.
+  const entries = unzipSync(await readFile(fixture('v8-scroll.zip')));
+  const library = strFromU8(entries['0-trace.trace']);
+  const fillAfter =
+    /"snapshotName":"after@call@10"[^\n]*?"timestamp":([\d.]+)/.exec(
+      library,
+    )?.[1];
+  const addInput =
+    /"snapshotName":"input@call@14"[^\n]*?"timestamp":([\d.]+)/.exec(
+      library,
+    )?.[1];
+  assert.ok(fillAfter && addInput);
+  entries['0-trace.trace'] = strToU8(
+    library.replace(
+      `"timestamp":${addInput}`,
+      `"timestamp":${(Number(fillAfter) + 10).toFixed(3)}`,
+    ),
+  );
+  const source = await openEntries(entries);
+  assert.deepEqual(moments(source.capture(V8_SCROLL.ADD)), ['after']);
 });
 
 test('a later trace without per-action screenshots falls back to the screen recording', async () => {
