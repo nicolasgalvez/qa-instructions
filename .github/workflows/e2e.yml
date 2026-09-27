@@ -47,7 +47,7 @@ jobs:
       - run: pnpm e2e
         working-directory: examples/derived-steps-1.56
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: qa-steps
@@ -56,7 +56,7 @@ jobs:
             examples/derived-steps/qa-steps-out/
             examples/derived-steps-1.56/qa-steps-out/
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
