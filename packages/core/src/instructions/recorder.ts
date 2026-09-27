@@ -50,6 +50,7 @@ type PendingStep = {
   url?: string;
   section?: string[];
   expectedResults: string[];
+  failed?: boolean;
 };
 
 /**
@@ -57,6 +58,10 @@ type PendingStep = {
  * a QA Step per user Action, with the checks that follow it as the step's
  * Expected Result, grouped into Sections by the test's own groups. Test
  * plumbing is dropped.
+ *
+ * A test that does not pass yields incomplete QA Instructions: the QA Steps
+ * stop at the first failed Action or check, and the step it belongs to is
+ * marked as the failing step.
  */
 export class QaInstructionsRecorder implements TestEventSink {
   private readonly steps: PendingStep[] = [];
@@ -68,10 +73,16 @@ export class QaInstructionsRecorder implements TestEventSink {
   private collapsedStep?: PendingStep;
   private start?: TestStartEvent;
   private end?: TestEndEvent;
+  private stopped = false;
 
   constructor(options: QaInstructionsRecorderOptions = {}) {
     this.phraser = options.phraser ?? new StepPhraser();
     this.presentation = options.sections ?? 'sections';
+  }
+
+  /** Which attempt of the test this recorder saw; 1 unless retried. */
+  get attempt(): number {
+    return this.start?.attempt ?? 1;
   }
 
   handle(event: TestEvent): void {
@@ -80,10 +91,12 @@ export class QaInstructionsRecorder implements TestEventSink {
         this.start = event;
         break;
       case 'action':
-        this.onAction(event);
+        if (!this.stopped) this.onAction(event);
+        this.stopAt(event);
         break;
       case 'check':
-        this.onCheck(event);
+        if (!this.stopped) this.onCheck(event);
+        this.stopAt(event);
         break;
       case 'groupStart':
         if (this.groups.length === 0) this.collapsedStep = undefined;
@@ -115,7 +128,7 @@ export class QaInstructionsRecorder implements TestEventSink {
       });
     }
     builder.setStatus(
-      !this.end || this.end.status === 'passed' ? 'complete' : 'failed',
+      !this.end || this.end.status === 'passed' ? 'complete' : 'incomplete',
     );
 
     for (const step of this.steps) {
@@ -124,9 +137,15 @@ export class QaInstructionsRecorder implements TestEventSink {
         url: step.url,
         expected: this.expectedResult(step.expectedResults),
         section: step.section,
+        failed: step.failed,
       });
     }
     return builder.toBundle();
+  }
+
+  /** Nothing after the first failure is a QA Step: the tester stops there. */
+  private stopAt(event: ActionEvent | CheckEvent): void {
+    if (event.failed) this.stopped = true;
   }
 
   private onAction(event: ActionEvent): void {
@@ -135,7 +154,7 @@ export class QaInstructionsRecorder implements TestEventSink {
     const url =
       event.kind === 'navigate' ? this.resolveUrl(event.url) : undefined;
     if (this.presentation === 'collapse' && this.groups.length > 0) {
-      this.collapseInto(this.groups[0], url);
+      this.collapseInto(this.groups[0], url, event.failed);
       return;
     }
     this.steps.push({
@@ -143,16 +162,22 @@ export class QaInstructionsRecorder implements TestEventSink {
       url,
       section: this.currentSection(),
       expectedResults: [],
+      failed: event.failed,
     });
   }
 
   /** Folds an Action into the one QA Step named after its outermost group. */
-  private collapseInto(title: string, url: string | undefined): void {
+  private collapseInto(
+    title: string,
+    url: string | undefined,
+    failed: boolean | undefined,
+  ): void {
     if (!this.collapsedStep) {
       this.collapsedStep = { action: title, expectedResults: [] };
       this.steps.push(this.collapsedStep);
     }
     this.collapsedStep.url ??= url;
+    if (failed) this.collapsedStep.failed = true;
   }
 
   private currentSection(): string[] | undefined {
@@ -167,7 +192,9 @@ export class QaInstructionsRecorder implements TestEventSink {
     if (!current) return;
 
     const phrase = this.phraser.check(event);
-    if (phrase) current.expectedResults.push(phrase);
+    if (!phrase) return;
+    current.expectedResults.push(phrase);
+    if (event.failed) current.failed = true;
   }
 
   private isUserAction(

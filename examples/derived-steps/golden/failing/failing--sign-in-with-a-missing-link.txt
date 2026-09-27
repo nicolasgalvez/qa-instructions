@@ -1,0 +1,5 @@
+**Incomplete:** the test failed at step 3, so any later steps are missing.
+
+1. Open http://127.0.0.1:4321/
+2. Click the **Sign in** link
+3. Click the **Forgot password** link (**test failed here**)

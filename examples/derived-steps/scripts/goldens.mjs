@@ -35,4 +35,14 @@ export const GOLDENS = [
     rendered: 'qa-steps-out/ignore/grouped--sign-in-with-good-credentials.txt',
     golden: 'golden/ignore/grouped--sign-in-with-good-credentials.txt',
   },
+  // Deliberately failing tests, run with retries (playwright.failing.config.ts).
+  ...[
+    'failing--sign-in-shows-the-wrong-user',
+    'failing--sign-in-with-a-missing-link',
+    'failing--setup-fails-before-any-step',
+    'failing--flaky-sign-in-passes-on-retry',
+  ].map((name) => ({
+    rendered: `qa-steps-out/failing/${name}.txt`,
+    golden: `golden/failing/${name}.txt`,
+  })),
 ];

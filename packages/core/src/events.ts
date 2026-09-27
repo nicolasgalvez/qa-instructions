@@ -48,12 +48,18 @@ export type ActionKind = UserActionKind | PlumbingKind;
 
 export type TestStartEvent = {
   type: 'testStart';
+  /** Stable identity of the test across attempts, when the runner has one. */
+  id?: string;
   title: string;
   runner: 'playwright' | 'jest';
   file?: string;
   /** Tags the runner reports for the test, as written (e.g. `@smoke`). */
   tags?: string[];
+  /** Line the test is declared on, to tell same-titled tests apart. */
+  line?: number;
   project?: string;
+  /** 1 for the first run of the test, higher for each retry. Default 1. */
+  attempt?: number;
   /** Base URL that relative navigation URLs resolve against. */
   baseUrl?: string;
 };
@@ -66,6 +72,8 @@ export type ActionEvent = {
   value?: string;
   /** Navigation URL, possibly relative to the test's base URL. */
   url?: string;
+  /** True when this Action is where the test failed. */
+  failed?: boolean;
 };
 
 export type CheckEvent = {
@@ -78,6 +86,8 @@ export type CheckEvent = {
   target?: ElementTarget;
   /** The expected value, when the runner reports one a person can read. */
   expected?: string;
+  /** True when this check is where the test failed. */
+  failed?: boolean;
 };
 
 export type TestEndEvent = {

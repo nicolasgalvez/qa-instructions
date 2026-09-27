@@ -123,6 +123,29 @@ test('"collapse" turns each group into one QA Step named after it', () => {
   assert.ok(bundle.steps.every((step) => step.section === undefined));
 });
 
+test('"collapse" marks the group’s QA Step when an Action inside it fails', () => {
+  const recorder = new QaInstructionsRecorder({ sections: 'collapse' });
+  for (const event of [
+    start,
+    groupStart('Pay'),
+    click('Checkout'),
+    { ...click('Pay now'), failed: true } as TestEvent,
+    groupEnd('Pay'),
+    { type: 'testEnd', status: 'failed' } as TestEvent,
+  ]) {
+    recorder.handle(event);
+  }
+  assert.equal(
+    renderQaSteps(recorder.toBundle()),
+    [
+      '**Incomplete:** the test failed at step 1, so any later steps are missing.',
+      '',
+      '1. Pay (**test failed here**)',
+      '',
+    ].join('\n'),
+  );
+});
+
 test('"collapse" keeps checks made after a group with its QA Step', () => {
   assert.equal(
     renderQaSteps(

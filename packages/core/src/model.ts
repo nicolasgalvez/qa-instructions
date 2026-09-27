@@ -13,6 +13,8 @@ export type QaStep = {
   assetIds?: string[];
   /** Titles of the Section this step is in, outermost group first. */
   section?: string[];
+  /** True on the QA Step where the test failed. */
+  failed?: boolean;
 };
 
 export type QaRunBundle = {
@@ -27,7 +29,11 @@ export type QaRunBundle = {
       project?: string;
     };
     capturedAt: string;
-    status: 'complete' | 'partial' | 'failed';
+    /**
+     * `incomplete`: derived from a test that did not pass, so the QA Steps
+     * stop where it failed.
+     */
+    status: 'complete' | 'incomplete';
   };
   steps: QaStep[];
   assets: Record<string, QaAsset>;
@@ -44,6 +50,7 @@ export type QaStepInput = {
   url?: string;
   assetIds?: string[];
   section?: string[];
+  failed?: boolean;
 };
 
 export type QaAssetInput = {

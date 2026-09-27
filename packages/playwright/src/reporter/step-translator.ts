@@ -76,7 +76,7 @@ export class PlaywrightStepTranslator {
 
   translate(test: TestCase, result: TestResult): TestEvent[] {
     return [
-      this.testStart(test),
+      { ...this.testStart(test), attempt: result.retry + 1 },
       ...this.translateSteps(result.steps),
       { type: 'testEnd', status: result.status },
     ];
@@ -88,9 +88,11 @@ export class PlaywrightStepTranslator {
 
     return {
       type: 'testStart',
+      id: test.id,
       title: test.title,
       runner: 'playwright',
       file: test.location.file,
+      line: test.location.line,
       tags: [...test.tags],
       project: project?.name || undefined,
       baseUrl: typeof baseURL === 'string' ? baseURL : undefined,
@@ -104,20 +106,39 @@ export class PlaywrightStepTranslator {
           return [this.action(step)];
         case 'expect': {
           const check = this.check(step);
-          return check ? [check] : [];
+          if (check) return [check];
+          return this.failed(step) ? [this.failureMarker()] : [];
         }
         case 'test.step':
           return [
             { type: 'groupStart', title: step.title },
-            ...this.translateSteps(step.steps),
+            ...this.innerSteps(step),
             { type: 'groupEnd', title: step.title },
           ];
         default:
           // Hook and fixture steps wrap the calls a test makes, including
           // calls made inside helpers and user fixtures.
-          return this.translateSteps(step.steps);
+          return this.innerSteps(step);
       }
     });
+  }
+
+  /**
+   * A grouping step's calls, plus a failure marker when the step failed but
+   * none of its calls or checks did (e.g. an error thrown in a `test.step`).
+   */
+  private innerSteps(step: TestStep): TestEvent[] {
+    const events = this.translateSteps(step.steps);
+    const failedInside = events.some(
+      (event) => 'failed' in event && event.failed,
+    );
+    return this.failed(step) && !failedInside
+      ? [...events, this.failureMarker()]
+      : events;
+  }
+
+  private failureMarker(): ActionEvent {
+    return { type: 'action', kind: 'other', failed: true };
   }
 
   private action(step: TestStep): ActionEvent {
@@ -131,6 +152,7 @@ export class PlaywrightStepTranslator {
       url:
         this.text(params.url) ??
         (verb === 'Navigate' ? step.subtitle : undefined),
+      failed: this.failed(step),
     };
   }
 
@@ -151,7 +173,13 @@ export class PlaywrightStepTranslator {
           : 'value',
       target,
       expected: this.text(this.params(step).expected),
+      failed: this.failed(step),
     };
+  }
+
+  /** A browser call or check whose own error failed the test. */
+  private failed(step: TestStep): true | undefined {
+    return step.error ? true : undefined;
   }
 
   private locator(step: TestStep): string | undefined {
