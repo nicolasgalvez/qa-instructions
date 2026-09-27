@@ -1,0 +1,23 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="FAQ">
+  <h1>Frequently asked questions</h1>
+  <details>
+    <summary>Shipping</summary>
+    <p>Orders ship within 2 business days.</p>
+  </details>
+  <details>
+    <summary>Returns</summary>
+    <p>Returns are free for 30 days.</p>
+  </details>
+  <button type="button" class="button" id="show-contact">
+    Show contact details
+  </button>
+  <p id="contact" hidden>Email help@example.com</p>
+  <script is:inline>
+    document.getElementById('show-contact').addEventListener('click', () => {
+      document.getElementById('contact').hidden = false;
+    });
+  </script>
+</Base>

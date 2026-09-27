@@ -7,6 +7,7 @@ import type {
   TestStartEvent,
 } from '@qa-instructions/core';
 
+import { CallSiteReader } from './call-site-reader.js';
 import { LocatorParser } from './locator-parser.js';
 
 /** Playwright `pw:api` step titles (the part before any quoted value) → neutral kinds. */
@@ -38,8 +39,8 @@ const ACTION_KINDS: Record<string, ActionKind> = {
   Evaluate: 'script',
   'Add init script': 'script',
   'Add script tag': 'script',
-  'Dispatch event': 'script',
-  Dispatch: 'script',
+  'Dispatch event': 'dispatch',
+  Dispatch: 'dispatch',
   'Get text content': 'read',
   'Get inner text': 'read',
   'Get input value': 'read',
@@ -69,10 +70,14 @@ const EXPECT_TITLE = /^Expect "(not )?([A-Za-z]+)"$/;
 /**
  * Playwright adapter for the core's inbound port: translates one test's
  * reporter steps (Playwright 1.63 title, subtitle, params, category) into the
- * neutral test event stream.
+ * neutral test event stream. What the step data leaves out (whether a call
+ * was forced, whether its result was used) is read from the call site.
  */
 export class PlaywrightStepTranslator {
-  constructor(private readonly locators = new LocatorParser()) {}
+  constructor(
+    private readonly locators = new LocatorParser(),
+    private readonly callSites = new CallSiteReader(),
+  ) {}
 
   translate(test: TestCase, result: TestResult): TestEvent[] {
     return [
@@ -144,15 +149,23 @@ export class PlaywrightStepTranslator {
   private action(step: TestStep): ActionEvent {
     const params = this.params(step);
     const verb = step.title.split(' "')[0];
+    const callSite = step.location
+      ? this.callSites.read(step.location)
+      : undefined;
+    const forced = params.force === true || callSite?.forced === true;
     return {
       type: 'action',
       kind: ACTION_KINDS[verb] ?? 'other',
       target: this.locators.parse(this.locator(step)),
-      value: this.text(params.value ?? params.text ?? params.key),
+      value: this.text(
+        params.value ?? params.text ?? params.key ?? params.type,
+      ),
       url:
         this.text(params.url) ??
         (verb === 'Navigate' ? step.subtitle : undefined),
       failed: this.failed(step),
+      ...(forced ? { forced } : {}),
+      ...(callSite ? { resultUsed: callSite.resultUsed } : {}),
     };
   }
 

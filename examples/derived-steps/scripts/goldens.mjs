@@ -45,4 +45,12 @@ export const GOLDENS = [
     rendered: `qa-steps-out/failing/${name}.txt`,
     golden: `golden/failing/${name}.txt`,
   })),
+  {
+    rendered: 'qa-steps-out/scripted-page--read-the-faq.txt',
+    golden: 'golden/scripted-page--read-the-faq.txt',
+  },
+  {
+    rendered: 'qa-steps-out/scripted-page--subscribe-to-the-newsletter.txt',
+    golden: 'golden/scripted-page--subscribe-to-the-newsletter.txt',
+  },
 ];

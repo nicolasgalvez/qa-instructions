@@ -40,9 +40,13 @@ export type UserActionKind =
   | 'goForward'
   | 'reload';
 
-/** Test plumbing a person cannot repeat by hand. Never an Action. */
+/**
+ * Test plumbing a person cannot repeat by hand. Never an Action, though a
+ * `script` or `dispatch` (an event fired by script, e.g. a synthetic click)
+ * may change the page and so become a warning step.
+ */
 export type PlumbingKind =
-  'wait' | 'script' | 'read' | 'request' | 'setup' | 'other';
+  'wait' | 'script' | 'dispatch' | 'read' | 'request' | 'setup' | 'other';
 
 export type ActionKind = UserActionKind | PlumbingKind;
 
@@ -68,12 +72,22 @@ export type ActionEvent = {
   type: 'action';
   kind: ActionKind;
   target?: ElementTarget;
-  /** Typed text, pressed key, or chosen option. */
+  /** Typed text, pressed key, chosen option, or dispatched event type. */
   value?: string;
   /** Navigation URL, possibly relative to the test's base URL. */
   url?: string;
   /** True when this Action is where the test failed. */
   failed?: boolean;
+  /**
+   * The runner pushed the Action past its usual checks (visible, stable,
+   * not covered), e.g. Playwright's `force: true`.
+   */
+  forced?: boolean;
+  /**
+   * Whether the test used the call's result (assigned, awaited into an
+   * expression, returned). Undefined when the runner cannot tell.
+   */
+  resultUsed?: boolean;
 };
 
 export type CheckEvent = {

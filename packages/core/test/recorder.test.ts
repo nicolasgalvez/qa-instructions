@@ -262,7 +262,7 @@ test('test plumbing never becomes a QA Step', () => {
       { type: 'action', kind: 'setup' },
       { type: 'action', kind: 'navigate', url: '/' },
       { type: 'action', kind: 'wait' },
-      { type: 'action', kind: 'script' },
+      { type: 'action', kind: 'script', resultUsed: true },
       { type: 'action', kind: 'read' },
       { type: 'action', kind: 'request', url: '/api/cart' },
       { type: 'action', kind: 'other' },
@@ -430,5 +430,149 @@ test('QA Steps render as numbered Jira-ready text', () => {
     renderQaSteps(bundle),
     '1. Open http://127.0.0.1:4321/ — The **Welcome** heading is visible\n' +
       '2. Click the **Sign in** link\n',
+  );
+});
+
+function flaggedSteps(...events: TestEvent[]) {
+  return record(...events).steps.map(
+    ({ action, expected, warning, approximate }) => ({
+      action,
+      ...(expected === undefined ? {} : { expected }),
+      ...(warning ? { warning } : {}),
+      ...(approximate ? { approximate } : {}),
+    }),
+  );
+}
+
+test('a script that changes the page is a warning step, in sequence', () => {
+  assert.deepEqual(
+    flaggedSteps(
+      { type: 'action', kind: 'navigate', url: '/faq' },
+      {
+        type: 'action',
+        kind: 'script',
+        target: { by: 'selector', value: 'details:not([open])' },
+        resultUsed: false,
+      },
+      {
+        type: 'check',
+        matcher: 'toBeVisible',
+        negated: false,
+        subject: 'element',
+        target: { by: 'text', value: 'Orders ship in 2 days' },
+      },
+      { type: 'action', kind: 'script' },
+      { type: 'action', kind: 'reload' },
+    ),
+    [
+      { action: 'Open http://127.0.0.1:4321/faq' },
+      {
+        action:
+          'The test changed the **details:not([open])** element with a script instead of a user action. If the page does not match what comes next, change it by hand to continue.',
+        expected: '**Orders ship in 2 days** is visible',
+        warning: true,
+      },
+      {
+        action:
+          'The test changed the page with a script instead of a user action. If the page does not match what comes next, you may need to do something by hand to continue.',
+        warning: true,
+      },
+      { action: 'Reload the page' },
+    ],
+  );
+});
+
+test('a script whose result the test uses only read the page: no warning', () => {
+  assert.deepEqual(
+    flaggedSteps(
+      { type: 'action', kind: 'reload' },
+      {
+        type: 'action',
+        kind: 'script',
+        target: { by: 'selector', value: 'details' },
+        resultUsed: true,
+      },
+    ),
+    [{ action: 'Reload the page' }],
+  );
+});
+
+test('a click done by script is the same warning, naming what to click', () => {
+  assert.deepEqual(
+    flaggedSteps(
+      {
+        type: 'action',
+        kind: 'dispatch',
+        target: { by: 'role', role: 'button', name: 'Show contact details' },
+        value: 'click',
+        resultUsed: true,
+      },
+      { type: 'action', kind: 'dispatch', value: 'input' },
+    ),
+    [
+      {
+        action:
+          'The test clicked the **Show contact details** button with a script instead of a user action. Click it yourself to continue.',
+        warning: true,
+      },
+      {
+        action:
+          'The test sent an **input** event to the page with a script instead of a user action. If the page does not match what comes next, you may need to do something by hand to continue.',
+        warning: true,
+      },
+    ],
+  );
+});
+
+test('a forced Action is marked approximate', () => {
+  assert.deepEqual(
+    flaggedSteps(
+      {
+        type: 'action',
+        kind: 'click',
+        target: { by: 'role', role: 'button', name: 'Subscribe' },
+        forced: true,
+      },
+      {
+        type: 'action',
+        kind: 'click',
+        target: { by: 'role', role: 'button', name: 'Close' },
+        forced: false,
+      },
+      { type: 'action', kind: 'script', resultUsed: true, forced: true },
+    ),
+    [
+      { action: 'Click the **Subscribe** button', approximate: true },
+      { action: 'Click the **Close** button' },
+    ],
+  );
+});
+
+test('warnings and approximate Actions are marked in Jira-ready text', () => {
+  const bundle = record(
+    {
+      type: 'action',
+      kind: 'dispatch',
+      target: { by: 'text', value: 'More' },
+      value: 'click',
+    },
+    {
+      type: 'action',
+      kind: 'click',
+      target: { by: 'role', role: 'button', name: 'Subscribe' },
+      forced: true,
+    },
+    {
+      type: 'check',
+      matcher: 'toBeVisible',
+      negated: false,
+      subject: 'element',
+      target: { by: 'text', value: 'Thanks' },
+    },
+  );
+  assert.equal(
+    renderQaSteps(bundle),
+    '1. Warning: The test clicked **More** with a script instead of a user action. Click it yourself to continue.\n' +
+      '2. Click the **Subscribe** button (approximate: the test forced this Action past its usual checks, so its highlight may not line up) — **Thanks** is visible\n',
   );
 });

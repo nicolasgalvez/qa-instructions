@@ -11,6 +11,7 @@ import type {
 } from '../events.js';
 import type { QaRunBundle } from '../model.js';
 import { StepPhraser } from './phraser.js';
+import { ScriptChangeRule } from './script-change-rule.js';
 
 const USER_ACTIONS: ReadonlySet<ActionKind> = new Set<UserActionKind>([
   'navigate',
@@ -41,6 +42,7 @@ export type SectionPresentation = 'sections' | 'collapse' | 'ignore';
 
 export type QaInstructionsRecorderOptions = {
   phraser?: StepPhraser;
+  scriptChanges?: ScriptChangeRule;
   /** Default `sections`. */
   sections?: SectionPresentation;
 };
@@ -51,13 +53,16 @@ type PendingStep = {
   section?: string[];
   expectedResults: string[];
   failed?: boolean;
+  warning?: boolean;
+  approximate?: boolean;
 };
 
 /**
  * Consumes one test's neutral event stream and produces its QA Instructions:
  * a QA Step per user Action, with the checks that follow it as the step's
  * Expected Result, grouped into Sections by the test's own groups. Test
- * plumbing is dropped.
+ * plumbing is dropped, except a script that changed the page, which becomes
+ * a warning step. Forced Actions are approximate.
  *
  * A test that does not pass yields incomplete QA Instructions: the QA Steps
  * stop at the first failed Action or check, and the step it belongs to is
@@ -66,6 +71,7 @@ type PendingStep = {
 export class QaInstructionsRecorder implements TestEventSink {
   private readonly steps: PendingStep[] = [];
   private readonly phraser: StepPhraser;
+  private readonly scriptChanges: ScriptChangeRule;
   private readonly presentation: SectionPresentation;
   /** Titles of the open groups, outermost first. */
   private readonly groups: string[] = [];
@@ -77,6 +83,7 @@ export class QaInstructionsRecorder implements TestEventSink {
 
   constructor(options: QaInstructionsRecorderOptions = {}) {
     this.phraser = options.phraser ?? new StepPhraser();
+    this.scriptChanges = options.scriptChanges ?? new ScriptChangeRule();
     this.presentation = options.sections ?? 'sections';
   }
 
@@ -138,6 +145,8 @@ export class QaInstructionsRecorder implements TestEventSink {
         expected: this.expectedResult(step.expectedResults),
         section: step.section,
         failed: step.failed,
+        warning: step.warning,
+        approximate: step.approximate,
       });
     }
     return builder.toBundle();
@@ -149,7 +158,10 @@ export class QaInstructionsRecorder implements TestEventSink {
   }
 
   private onAction(event: ActionEvent): void {
-    if (!this.isUserAction(event)) return;
+    if (!this.isUserAction(event)) {
+      if (this.scriptChanges.changesPage(event)) this.warn(event);
+      return;
+    }
 
     const url =
       event.kind === 'navigate' ? this.resolveUrl(event.url) : undefined;
@@ -163,6 +175,22 @@ export class QaInstructionsRecorder implements TestEventSink {
       section: this.currentSection(),
       expectedResults: [],
       failed: event.failed,
+      approximate: event.forced === true,
+    });
+  }
+
+  /**
+   * Adds a warning step where the test changed the page by script. It is
+   * never folded into a collapsed group: the group's later Actions start a
+   * new step after it, so the order stays true.
+   */
+  private warn(event: ActionEvent): void {
+    this.collapsedStep = undefined;
+    this.steps.push({
+      action: this.phraser.scriptChange(event),
+      section: this.currentSection(),
+      expectedResults: [],
+      warning: true,
     });
   }
 

@@ -40,6 +40,8 @@ export function createBundleBuilder(): BundleBuilder {
         assetIds: input.assetIds,
         section: input.section,
         failed: input.failed || undefined,
+        warning: input.warning || undefined,
+        approximate: input.approximate || undefined,
       };
       steps.push(step);
       return step;

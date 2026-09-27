@@ -8,6 +8,15 @@ Steps come from the reporter's `pw:api` steps (browser actions a person can repe
 
 All logic (turning actions and checks into QA Steps, Sections, Expected Results, choosing screenshots, masking secrets, rendering) lives in a runner-independent core with ports: an inbound port that accepts a neutral stream of test events (action, check, group start/end, screenshot reference), and outbound ports for screenshot sources and output writers. No core code depends on Playwright's `Reporter`/`TestStep` types or on Jest's. The Playwright reporter is a thin adapter that translates reporter events (and trace screenshots) into core events; a Jest adapter can later feed the same port without touching core logic.
 
+## Script changes and forced Actions
+
+A script can change the page (opening every collapsed accordion with `evaluateAll`), leaving a tester stuck. Playwright 1.63 step data does not say what a script did: `Evaluate` steps carry only the locator, never the expression or its result, and `force: true` is not in any step's params. The adapter therefore reads the test's own source at the step's `location` (a lexical reading, not a parser) for two facts, and the core decides from them:
+
+- **Changed or read.** An event fired by script (`dispatchEvent`) always changes the page. An `evaluate`-family call whose result the test uses (assigned, awaited inside an expression, returned, passed on) read the page: no warning. One whose result is discarded (`await locator.evaluateAll(...)` as its own statement), or whose call site cannot be read, may have changed the page: a warning step at that point, carrying the checks that follow it as its Expected Result so the tester sees what to restore by hand.
+- **Forced.** `force: true` written in the call's options (or a `force` param, should a runner report one) marks the Action approximate.
+
+Limits: a discarded script that changed nothing (e.g. `scrollTo(0, 0)` at the top) still warns; a script whose result is used but that also changed the page does not; options built elsewhere (`click(opts)`) are not seen as forced. The warning cannot say what to do ("open it"), only that the page changed and what the test checked next. Trace snapshots could detect DOM change directly; that waits for the trace adapter.
+
 ## Considered Options
 
 - **Keep the fixture**: rejected; requires rewriting tests and bundling Playwright.
