@@ -36,6 +36,11 @@ export type RecordedElement = {
    * tell a tester which one.
    */
   lookalikes?: number;
+  /**
+   * What the page titles it as a part of the page, the same way as
+   * {@link RecordedRegion.title}. Undefined when it has none.
+   */
+  title?: string;
   /** The part of the page it sits in, as the page showed it. */
   region?: RecordedRegion;
 };

@@ -1,14 +1,5 @@
 import type { RecordedElement } from '../screenshots/source.js';
-import { ElementNamer } from './element-namer.js';
-
-/** Words a tester uses for a part of the page, by its role; any other is a section. */
-const REGION_NOUNS: Record<string, string> = {
-  form: 'form',
-  dialog: 'dialog',
-  row: 'row',
-  table: 'table',
-  navigation: 'navigation',
-};
+import { ElementNamer, PART_ROLES, ROLE_NOUNS } from './element-namer.js';
 
 /** How a QA Step names the part of the page an element is in. */
 export type RegionName = {
@@ -34,6 +25,8 @@ export class RegionNamer {
     if (!region.scope && (element?.lookalikes ?? 1) <= 1) return undefined;
 
     const role = this.namer.role({ ...region, text: '', labels: [] });
-    return { title, noun: (role && REGION_NOUNS[role]) ?? 'section' };
+    // Any part a tester has no word for is a section.
+    const noun = role && PART_ROLES.has(role) ? ROLE_NOUNS[role] : 'section';
+    return { title, noun };
   }
 }

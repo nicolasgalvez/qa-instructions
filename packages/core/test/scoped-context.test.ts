@@ -170,6 +170,46 @@ test('the part of the page is named only when the test scoped to it or the page 
   );
 });
 
+test('a checked form is named as later steps name it, whatever its message', () => {
+  const visible = (element: RecordedElement, description?: string) =>
+    steps(
+      [
+        { type: 'action', kind: 'navigate', url: '/certificates' },
+        {
+          type: 'check',
+          matcher: 'toBeVisible',
+          negated: false,
+          subject: 'element',
+          target: css('#edd_purchase_102'),
+          ...(description ? { description } : {}),
+          ref: 'check',
+        },
+      ],
+      { check: element },
+    )[0].expected;
+  const form = (title?: string): RecordedElement => ({
+    tag: 'form',
+    attributes: { id: 'edd_purchase_102' },
+    text: 'Renewable Energy Certificates (RECs) Quantity Add to Cart',
+    labels: [],
+    lookalikes: 1,
+    ...(title ? { title } : {}),
+  });
+
+  const named = 'The **Renewable Energy Certificates (RECs)** form is visible';
+  assert.equal(
+    visible(form(product.title), 'purchase form for 102 on /certificates/'),
+    named,
+  );
+  assert.equal(visible(form(product.title)), named);
+  // A form the page gives no name still reads by its message.
+  assert.equal(
+    visible(form(), 'purchase form for 102'),
+    '**purchase form for 102** is visible',
+  );
+  assert.equal(visible(form()), 'The form is visible');
+});
+
 test('a text check that names no element does not name a part of the page', () => {
   assert.deepEqual(
     steps(

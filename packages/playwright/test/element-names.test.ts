@@ -102,12 +102,15 @@ test('with DOM snapshots, the trace says what each element looked like on the pa
     lookalikes: 2,
     region: product,
   });
+  // The heading just before it is a fact the adapter reports; only the
+  // core decides that a field is not named by it.
   assert.deepEqual(element(NAMES.quantity), {
     tag: 'input',
     attributes: { type: 'number', name: 'quantity', value: '1' },
     text: '',
     labels: [],
     lookalikes: 2,
+    title: 'Energy Certificates',
     region: product,
   });
   // A check's element comes through too.
@@ -200,6 +203,14 @@ test('the part of the page an element is in comes from the test scope, else from
       'body',
     )?.region,
     undefined,
+  );
+  // A part of the page checked itself carries its title, as when it holds
+  // the element a later step touches.
+  assert.equal(
+    target(
+      `<body><form id="a" __playwright_target__="call@1"><h2>Basic</h2><input name="q"></form></body>`,
+    )?.title,
+    'Basic',
   );
   // A heading holding the element itself does not title its part.
   assert.equal(
