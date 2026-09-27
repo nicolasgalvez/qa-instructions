@@ -7,7 +7,7 @@ export default defineConfig({
   reporter: [
     ['list'],
     ['html', { open: 'never' }],
-    ['@qa-instructions/playwright/collector', { outputDir: 'qa-runs' }],
+    ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs' }],
   ],
   use: {
     baseURL,

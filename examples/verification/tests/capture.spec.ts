@@ -1,40 +1,20 @@
-import { test, expect } from '@qa-instructions/playwright';
+import { test, expect } from '@playwright/test';
 
-test('Login error flow', async ({ qa, page }) => {
-  qa.guide({
-    title: 'Login error flow',
-    prerequisite: 'Fixture app running at http://127.0.0.1:4321',
-  });
+// An ordinary Playwright test: nothing here knows about qa-instructions.
+// The reporter in playwright.config.ts derives the QA Steps.
 
-  await qa.step(
-    'Open the fixture app home page',
-    'Blue STEP 1 HOME marker is visible',
-    async () => {
-      await page.goto('/');
-      await expect(page.getByTestId('step-marker')).toHaveText('STEP 1 HOME');
-    },
+test('Login error flow', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('step-marker')).toHaveText('STEP 1 HOME');
+
+  await page.getByTestId('sign-in-link').click();
+  await expect(page.getByTestId('step-marker')).toHaveText('STEP 2 LOGIN');
+  await expect(page.getByTestId('username')).toBeVisible();
+
+  await page.getByTestId('submit-bad-credentials').click();
+  await expect(page).toHaveURL(/login-error/);
+  await expect(page.getByTestId('error-banner')).toHaveText(
+    'Invalid credentials',
   );
-
-  await qa.step(
-    'Click Sign in',
-    'Orange STEP 2 LOGIN marker and credential form are visible',
-    async () => {
-      await page.getByTestId('sign-in-link').click();
-      await expect(page.getByTestId('step-marker')).toHaveText('STEP 2 LOGIN');
-      await expect(page.getByTestId('username')).toBeVisible();
-    },
-  );
-
-  await qa.step(
-    'Submit bad credentials',
-    'Red error banner and STEP 3 ERROR marker are visible',
-    async () => {
-      await page.getByTestId('submit-bad-credentials').click();
-      await expect(page).toHaveURL(/login-error/);
-      await expect(page.getByTestId('error-banner')).toHaveText(
-        'Invalid credentials',
-      );
-      await expect(page.getByTestId('step-marker')).toHaveText('STEP 3 ERROR');
-    },
-  );
+  await expect(page.getByTestId('step-marker')).toHaveText('STEP 3 ERROR');
 });

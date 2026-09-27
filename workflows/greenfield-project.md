@@ -102,8 +102,8 @@ After this workflow completes, the **product** runs on its own schedule:
 
 ```
 Trigger: CI or `pnpm test` in consumer project
-  → Playwright test with qa fixture
-  → collector writes qa-runs/
+  → unmodified Playwright tests
+  → qa-instructions reporter writes qa-runs/
   → `qa-instructions render` → qa-steps-out/
   → human pastes to ticket (checkpoint: optional review of steps)
 ```

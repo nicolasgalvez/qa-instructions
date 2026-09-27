@@ -1,23 +1,89 @@
-# qa-instructions — Design Spec
+# qa-instructions — Design
 
 ## Goal
 
-Capture browser test steps and evidence agnostically during a test run, then render human-repeatable QA instructions in a separate step. Test-runner adapters only collect; renderers only transform.
+Turn what an existing Playwright test already does into QA Instructions a person can follow by hand, without changing the test. The developer adds one reporter to their Playwright config; every test run then produces QA Instructions per test. Rendering to ticket text happens in a separate step.
 
-## Core principle: collect → render
+The decision and its alternatives are recorded in [ADR 0001](./adr/0001-reporter-derived-qa-steps.md). Vocabulary (QA Instructions, QA Step, Action, Expected Result, Section, Step Screenshot, Highlight) is defined in [CONTEXT.md](../CONTEXT.md).
+
+## Setup
+
+```typescript
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  reporter: [
+    ['list'],
+    ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs' }],
+  ],
+});
+```
+
+Tests are not changed. `@playwright/test` is a peer dependency used for types only; the package never loads Playwright at runtime, so it always runs against the project's own Playwright. Step Screenshots will come from Playwright's trace and add one `trace` setting to this config (see ADR 0001).
+
+Post-test CI step:
+
+```yaml
+- run: npx qa-instructions render qa-runs/ --format qa-steps --out qa-steps-out/
+- uses: actions/upload-artifact@v4
+  with:
+    name: qa-steps
+    path: qa-steps-out/
+```
+
+## Pipeline
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  Test adapter   │────▶│   QaRunBundle    │────▶│    Renderers    │
-│  (Playwright…)  │     │  (canonical JSON │     │  qa-steps.txt   │
-│                 │     │   + assets)      │     │  markdown       │
-│  capture only   │     │                  │     │  json (passthru)│
-└─────────────────┘     └──────────────────┘     └─────────────────┘
+┌──────────────────────┐    ┌──────────────────────┐    ┌──────────────┐    ┌──────────────┐
+│ Playwright reporter  │───▶│ Core recorder        │───▶│ QaRunBundle  │───▶│  Renderers   │
+│ (adapter)            │    │ test events →        │    │ JSON +       │    │  qa-steps    │
+│ reporter steps →     │    │ QA Instructions      │    │ assets       │    │  json        │
+│ neutral test events  │    │                      │    │              │    │              │
+└──────────────────────┘    └──────────────────────┘    └──────────────┘    └──────────────┘
 ```
 
-Nothing in capture knows about Jira, Markdown, or HTML. Nothing in render knows about Playwright, Jest, or CDP.
+Nothing in the core knows about Playwright or Jest. Nothing in rendering knows about test runners. Adding an output format is one pure function in the core's renderers; adding a test runner is one adapter that feeds the same event port.
 
-Adding a new output format = one pure function in `@qa-instructions/core/render`. Adding a new test runner = one adapter that produces the same bundle shape.
+## Layer responsibilities
+
+### `@qa-instructions/core`
+
+| Module          | Responsibility                                                                                     |
+| --------------- | -------------------------------------------------------------------------------------------------- |
+| `events`        | Inbound port: runner-neutral test events (test start/end, action, check)                           |
+| `instructions/` | `QaInstructionsRecorder` turns one test's events into QA Instructions; `StepPhraser` words them    |
+| `model`         | Bundle types: `QaRunBundle`, `QaStep`, `QaAsset`                                                   |
+| `bundle/`       | In-memory bundle builder; `writeBundle(dir, bundle, assets)`, `readBundle(dir)`, `bundleDirName()` |
+| `render/`       | Pure transforms: `renderQaSteps(bundle)`, `renderJson(bundle)`                                     |
+
+The recorder makes one QA Step per user Action (opening a URL, clicking, typing, pressing a key, choosing an option). Test plumbing a tester cannot repeat (waits, scripts, value reads, API requests, setup) is dropped. The checks that follow an Action become that QA Step's Expected Result; an Action with no following check has none.
+
+### `@qa-instructions/playwright`
+
+One entry point, `@qa-instructions/playwright/reporter`, whose default export is `QaInstructionsReporter`, a Playwright `Reporter`:
+
+- On `onTestEnd`, `PlaywrightStepTranslator` walks the test's `pw:api` and `expect` steps and emits core test events.
+- The core recorder builds the bundle, which is written to `<outputDir>/<file>--<test title>/`.
+- It never throws into the test run; a failure to write is logged as a warning.
+- It does not render.
+
+### `@qa-instructions/cli`
+
+Separate render step, invokable in CI after tests:
+
+```bash
+# Render all bundles collected during the run
+qa-instructions render qa-runs/ --format qa-steps --out qa-steps-out/
+```
+
+Also usable programmatically:
+
+```typescript
+import { readBundle, renderQaSteps } from '@qa-instructions/core';
+
+const bundle = await readBundle('qa-runs/login--sign-in');
+const text = renderQaSteps(bundle);
+```
 
 ## Canonical data: `QaRunBundle`
 
@@ -62,169 +128,40 @@ On disk, a bundle is a directory:
 
 ```
 qa-runs/
-  login-flow/
+  sign-in--sign-in-with-bad-credentials/
     bundle.json
     assets/
-      step-01-screenshot.png
-      step-02-screenshot.png
 ```
 
-Renderers read `bundle.json` + resolve assets from `assets/`. No runner-specific fields in the step model.
+Renderers read `bundle.json` and resolve assets from `assets/`. No runner-specific fields in the step model.
 
-## Layer responsibilities
+## Renderers
 
-### `@qa-instructions/core`
+| Renderer        | Output                | Consumer               |
+| --------------- | --------------------- | ---------------------- |
+| `renderQaSteps` | Plain numbered list   | Jira / ticket QA field |
+| `renderJson`    | Pretty-printed bundle | Tooling, passthrough   |
 
-| Module       | Responsibility                                                                       |
-| ------------ | ------------------------------------------------------------------------------------ |
-| `model/`     | Types: `QaRunBundle`, `QaStep`, `QaAsset`                                            |
-| `bundle/`    | `createBundle()`, `addStep()`, `addAsset()`, `finalizeBundle()` — in-memory builder  |
-| `bundle/io/` | `writeBundle(dir, bundle, assets)`, `readBundle(dir)`                                |
-| `render/`    | Pure transforms: `renderQaSteps(bundle) → string`, `renderMarkdown(bundle) → string` |
+## Planned
 
-Render functions return strings (or `{ content, assets }` for formats that rewrite paths). They never call Playwright or touch the filesystem unless explicitly passed a bundle directory for asset path resolution.
-
-### `@qa-instructions/playwright` (Phase 1 adapter)
-
-**Capture side only:**
-
-- `test.extend({ qa })` — exposes `qa.step(action, expected, fn)` and `qa.guide({ prerequisite, title })`
-- Each `qa.step()`:
-  1. Runs action inside `test.step()`
-  2. Captures screenshot via `step.attach()` (Playwright ≥ 1.51)
-  3. Appends to in-memory `QaRunBundle` builder
-- After test: serializes `bundle.json` body via `testInfo.attach('qa-run-bundle', …)`
-
-**Reporter side (collection only):**
-
-- `QaCollectorReporter` implements Playwright `Reporter`
-- On `onTestEnd`: extract `qa-run-bundle` attachment + step-scoped screenshot attachments
-- Write bundle directory to configured output (default: `qa-runs/<test-id>/`)
-- Does **not** call renderers
-
-Native Playwright HTML report continues to show step attachments via built-in reporter — no custom work needed.
-
-### `@qa-instructions/cli` (Phase 1)
-
-Separate render step, invokable in CI after tests:
-
-```bash
-# Render all bundles collected during the run
-qa-instructions render qa-runs/ --format qa-steps --out dist/qa-steps/
-
-# Single format
-qa-instructions render qa-runs/login-flow/ --format markdown --out dist/docs/
-```
-
-Also usable programmatically:
-
-```typescript
-import { readBundle, renderQaSteps } from '@qa-instructions/core';
-
-const bundle = await readBundle('qa-runs/login-flow');
-const text = renderQaSteps(bundle);
-```
-
-## Renderers (Phase 1 → 2)
-
-| Renderer         | Output                     | Consumer               | Phase |
-| ---------------- | -------------------------- | ---------------------- | ----- |
-| `renderQaSteps`  | Plain numbered list        | Jira / ticket QA field | 1     |
-| `renderMarkdown` | Markdown + `![](assets/…)` | PR artifacts, docs     | 2     |
-| `renderJson`     | Pretty-printed bundle      | Tooling, passthrough   | 1     |
-
-Phase 1 ships `renderQaSteps` and `renderJson`. Markdown is one function away once bundle format is stable.
-
-## Playwright config (Phase 1)
-
-```typescript
-import { defineConfig } from '@qa-instructions/playwright';
-
-export default defineConfig({
-  reporter: [
-    ['list'],
-    ['html'],
-    ['@qa-instructions/playwright/collector', { outputDir: 'qa-runs' }],
-  ],
-});
-```
-
-Post-test CI step:
-
-```yaml
-- run: npx qa-instructions render qa-runs/ --format qa-steps --out qa-steps-out/
-- uses: actions/upload-artifact@v4
-  with:
-    name: qa-steps
-    path: qa-steps-out/
-```
-
-## Explicit step authoring
-
-```typescript
-import { test, expect } from '@qa-instructions/playwright';
-
-test('Create a project', async ({ qa, page }) => {
-  qa.guide({
-    title: 'Create a project',
-    prerequisite: 'Deploy branch to dev first.',
-  });
-
-  await qa.step(
-    'Open https://app.example.com/projects',
-    'Project list loads with no error',
-    async () => {
-      await page.goto('https://app.example.com/projects');
-      await expect(
-        page.getByRole('heading', { name: 'Projects' }),
-      ).toBeVisible();
-    },
-  );
-
-  await qa.step(
-    'Click `New project`',
-    'Dialog shows empty name field',
-    async () => {
-      await page.getByRole('button', { name: 'New project' }).click();
-      await expect(page.getByRole('dialog')).toBeVisible();
-    },
-  );
-});
-```
-
-## Retry and partial capture
-
-- **Retries:** Collector uses the last test attempt's bundle attachment only.
-- **Failure mid-guide:** Emit bundle with `status: 'partial'` and steps captured so far. Renderer adds no commentary — partial steps are still useful.
-
-## Out of scope (v0.1)
-
-- Jest adapter
-- DevTools Recorder import (future CLI script, not a package)
-- Jira API integration
-- Auto-instrumentation of `page` methods
-- Custom HTML report UI (use Playwright's native report for screenshots)
+Tracked under the QI-5 epic: Step Screenshots from the trace, Highlights, Sections from `test.step`, warnings for script-driven page changes and forced clicks, incomplete QA Instructions for failed tests, test selection, masking, and Markdown/HTML renderers.
 
 ## Differentiation from docs-tests
 
-docs-tests couples capture + Markdown render in one reporter pass. qa-instructions separates collection from render so the same run produces ticket steps, Markdown, or future formats without re-running tests. Output contract targets qa-steps skill format (terse, falsifiable, prerequisite line) rather than product documentation prose.
+docs-tests couples capture and Markdown rendering in one reporter pass and requires tests written for it. qa-instructions derives steps from unmodified tests and separates collection from rendering, so the same run produces ticket steps or future formats without re-running tests.
 
-See [research/2026-03-27-competitive-and-api-research.md](./research/2026-03-27-competitive-and-api-research.md) (primary-source citations), [competitive-landscape.md](./competitive-landscape.md) (summary), and [framework-hooks.md](./framework-hooks.md) (quick API reference).
+See [research/2026-09-26-auto-derived-qa-steps-prior-art.md](./research/2026-09-26-auto-derived-qa-steps-prior-art.md), [research/2026-03-27-competitive-and-api-research.md](./research/2026-03-27-competitive-and-api-research.md), [competitive-landscape.md](./competitive-landscape.md), and [framework-hooks.md](./framework-hooks.md).
 
 ## Package layout
 
 ```
 packages/
-  core/                 # model, bundle builder, bundle I/O, renderers
-  playwright/           # qa fixture + collector reporter
+  core/                 # event port, recorder, bundle model + I/O, renderers
+  playwright/           # reporter adapter
   cli/                  # qa-instructions render command
 examples/
-  basic/                # one test, demonstrates collect → render loop
+  verification/         # golden e2e against the fixture site
+  derived-steps/        # golden e2e: helpers, plumbing, role/label locators
+  basic/                # smoke against playwright.dev
+  fixture-site/         # local Astro site the e2e examples run against
 ```
-
-## Success criteria
-
-1. Run Playwright test → bundle written to `qa-runs/`
-2. `qa-instructions render` → `qa-steps.txt` pasteable into Jira
-3. Playwright HTML report shows per-step screenshots natively
-4. Adding `renderMarkdown` requires zero changes to playwright adapter
