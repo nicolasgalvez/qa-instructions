@@ -1,12 +1,15 @@
 name: E2E
 
-# Deterministic fixture-site capture/render + golden verification (main only).
+# Deterministic fixture-site capture/render + golden verification.
 # Runner: ubuntu-latest (public repo — hosted minutes free). Switch to
 # [self-hosted, linux] on ruby when org limits require it; see docs/ci.md.
 on:
   push:
     branches: [main]
     paths-ignore: ['**/*.md', 'docs/**']
+  # No paths-ignore on PRs: "e2e goldens" is a required check, so it must
+  # report on docs-only PRs too or they can never merge.
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,6 +17,8 @@ concurrency:
 
 jobs:
   e2e:
+    # Required status check name in the "protect" ruleset — rename both together.
+    name: e2e goldens
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
