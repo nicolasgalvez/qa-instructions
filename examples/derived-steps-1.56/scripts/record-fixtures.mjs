@@ -11,6 +11,7 @@ import { SPECS, derivedSteps, root, syncSpecs } from './shared.mjs';
 //   traces/v8.zip                         the sample scenario's 1.56 trace
 //   traces/v8-checks.zip                  the cart test's 1.56 trace, whose
 //                                         checks the steps do not describe
+//   traces/v8-scroll.zip                  the scroll scenario's 1.56 trace
 
 const fixtures = path.join(
   root,
@@ -21,7 +22,14 @@ const fixtures = path.join(
   'test',
   'fixtures',
 );
-const scenario = path.join(fixtures, 'traces', 'scenario.spec.ts');
+/** The adapter's own trace scenarios, recorded by the `trace` project. */
+const SCENARIOS = ['scenario.spec.ts', 'scroll.spec.ts'];
+/** Each recorded test's results directory prefix and the sample trace it becomes. */
+const TRACES = [
+  ['scenario-', 'v8.zip'],
+  ['scroll-', 'v8-scroll.zip'],
+  ['cart-', 'v8-checks.zip'],
+];
 
 function run(cwd, config) {
   const result = spawnSync(
@@ -42,7 +50,12 @@ function run(cwd, config) {
 
 await syncSpecs();
 await mkdir(path.join(root, 'trace-scenario'), { recursive: true });
-await copyFile(scenario, path.join(root, 'trace-scenario', 'scenario.spec.ts'));
+for (const spec of SCENARIOS) {
+  await copyFile(
+    path.join(fixtures, 'traces', spec),
+    path.join(root, 'trace-scenario', spec),
+  );
+}
 
 await rm(path.join(fixtures, 'steps', '1.56'), {
   recursive: true,
@@ -64,10 +77,7 @@ for (const spec of SPECS) {
 
 const traceDir = path.join(root, 'test-results', 'record');
 const recordedTraces = await readdir(traceDir);
-for (const [prefix, fixture] of [
-  ['scenario-', 'v8.zip'],
-  ['cart-', 'v8-checks.zip'],
-]) {
+for (const [prefix, fixture] of TRACES) {
   const recorded = recordedTraces.find((d) => d.startsWith(prefix));
   await copyFile(
     path.join(traceDir, recorded, 'trace.zip'),

@@ -81,6 +81,12 @@ export const GOLDENS = [
     rendered: 'qa-steps-out/cart--add-credits-to-the-cart.txt',
     golden: 'golden/cart--add-credits-to-the-cart.txt',
   },
+  // A field and button far below the fold: Playwright scrolls to each.
+  {
+    rendered:
+      'qa-steps-out/long-page--order-boots-from-the-bottom-of-the-page.txt',
+    golden: 'golden/long-page--order-boots-from-the-bottom-of-the-page.txt',
+  },
 ];
 
 const DATA_URI = /data:image\/png;base64,[A-Za-z0-9+/=]+/g;
@@ -117,4 +123,5 @@ export const SCREENSHOT_GOLDENS = [
   'golden/scripted-page--subscribe-to-the-newsletter.screenshots.json',
   'golden/moving-ui--register-a-warranty-from-the-menu.screenshots.json',
   'golden/moving-ui--highlight-styles.screenshots.json',
+  'golden/long-page--order-boots-from-the-bottom-of-the-page.screenshots.json',
 ];

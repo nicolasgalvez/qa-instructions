@@ -1,0 +1,22 @@
+{
+  "bundleDirs": ["long-page--order-boots-from-the-bottom-of-the-page"],
+  "viewport": { "width": 800, "height": 600 },
+  "minBytes": 2000,
+  "steps": [
+    {
+      "index": 3,
+      "action": "Click the **Add Trail boots to cart** button",
+      "moment": "action",
+      "probes": [
+        { "name": "outline", "at": "outline", "rgb": [255, 0, 128] },
+        {
+          "name": "the button, scrolled into view",
+          "at": "inside",
+          "dx": 6,
+          "rgb": [31, 79, 216]
+        },
+        { "name": "click dot", "at": "clickPoint", "rgb": [255, 0, 128] }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+1. Open http://127.0.0.1:4321/order
+2. Type **3** into **Trail boots quantity**
+3. Click the **Add Trail boots to cart** button — **Added 3 Trail boots to the cart** is visible

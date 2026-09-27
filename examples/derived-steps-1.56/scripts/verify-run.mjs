@@ -9,7 +9,7 @@ import { GOLDENS, derivedSteps, root } from './shared.mjs';
 // goldens, and every QA Step must have a Step Screenshot from the trace's
 // screen recording (a JPEG frame). A click whose frame shows the moment it
 // was made (moment `action`) has its click point marked; every other frame
-// is from when the Action ended (moment `after`) and is left unmarked.
+// is from after the Action ended (moment `after`) and is left unmarked.
 
 const JPEG = Buffer.from([0xff, 0xd8, 0xff]);
 
@@ -122,6 +122,61 @@ for (const name of GOLDENS) {
 // timing, so not every click gets one; but most do, and some must.
 if (markedClicks === 0) {
   fail('no click step has its click point marked');
+}
+
+// The long page: Playwright scrolls to the field before typing and to the
+// button before clicking. The fill's screenshot must show the typed value
+// (the field turns green); the click is marked only on a frame showing the
+// button under the click point, not yet clicked (it turns gray).
+const LONG_PAGE = 'long-page--order-boots-from-the-bottom-of-the-page';
+const CHANGED_FIELD = [25, 169, 116];
+const BUTTON = [31, 79, 216];
+
+function near(color, expected) {
+  return color.every((c, k) => Math.abs(c - expected[k]) <= TOLERANCE);
+}
+
+/** How many pixels of a Step Screenshot are within tolerance of `rgb`. */
+async function countColor(data, rgb) {
+  const { data: pixels, info } = await sharp(data)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  let count = 0;
+  for (let i = 0; i < pixels.length; i += info.channels) {
+    if (near([pixels[i], pixels[i + 1], pixels[i + 2]], rgb)) count += 1;
+  }
+  return count;
+}
+
+if (bundleDirs.includes(LONG_PAGE)) {
+  const dir = path.join(root, 'qa-runs', LONG_PAGE);
+  const bundle = JSON.parse(
+    await readFile(path.join(dir, 'bundle.json'), 'utf8'),
+  );
+  const image = (step) =>
+    readFile(
+      path.join(dir, 'assets', bundle.assets[step.assetIds[0]].filename),
+    );
+  const [, fill, click] = bundle.steps;
+
+  // The field is 140×39 CSS pixels; most of it shows the green.
+  const green = await countColor(await image(fill), CHANGED_FIELD);
+  if (green < 2000) {
+    fail(
+      `${LONG_PAGE} step 2: the typed value is not shown (${green} green pixels)`,
+    );
+  }
+
+  if (click.screenshotMoment === 'action') {
+    // Beside the dot (radius 6), inside the 240×51 button.
+    const beside = { x: click.clickPoint.x - 20, y: click.clickPoint.y };
+    const color = await colorAt(await image(click), beside, click.viewport);
+    if (!near(color, BUTTON)) {
+      fail(
+        `${LONG_PAGE} step 3: the click is marked on rgb(${color}), not on the button`,
+      );
+    }
+  }
 }
 
 if (failed) process.exit(1);
