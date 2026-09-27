@@ -1,0 +1,30 @@
+{
+  "bundleDirs": ["scripted-page--subscribe-to-the-newsletter"],
+  "viewport": { "width": 800, "height": 600 },
+  "minBytes": 2000,
+  "highlights": [null, ["outline", "clickDot"]],
+  "steps": [
+    {
+      "action": "Open http://127.0.0.1:4321/newsletter",
+      "moment": "after",
+      "probes": []
+    },
+    {
+      "action": "Click the **Subscribe** button",
+      "moment": "action",
+      "probes": [
+        {
+          "name": "a dash of the approximate outline",
+          "at": "outlineDash",
+          "rgb": [255, 0, 128]
+        },
+        {
+          "name": "the gap between dashes",
+          "at": "outlineDashGap",
+          "rgb": [255, 255, 255]
+        },
+        { "name": "click dot", "at": "clickPoint", "rgb": [255, 0, 128] }
+      ]
+    }
+  ]
+}

@@ -650,6 +650,47 @@ test('with the trace setting on, each QA Step gets a Step Screenshot from the tr
   assert.deepEqual(bundle.steps[2].clickPoint, { x: 100, y: 60 });
 });
 
+function highlights(bundle: QaRunBundle) {
+  return bundle.steps.map(
+    (step) => bundle.assets[step.assetIds?.[0] ?? '']?.highlight,
+  );
+}
+
+test('Step Screenshots are highlighted by default: an outline, and the click point for clicks', async () => {
+  const { bundle } = await runAttempts([
+    { steps: sampleSteps, attachments: sampleTrace },
+  ]);
+
+  assert.deepEqual(highlights(bundle), [
+    // Navigation and key presses touch no element.
+    undefined,
+    ['outline'],
+    ['outline', 'clickDot'],
+    undefined,
+  ]);
+  assert.deepEqual(bundle.steps[2].viewport, { width: 400, height: 300 });
+});
+
+test('reporter passes the highlight style option to the core', async () => {
+  const badge = await runAttempts(
+    [{ steps: sampleSteps, attachments: sampleTrace }],
+    { highlight: ['outline', 'badge'] },
+  );
+  assert.deepEqual(highlights(badge.bundle)[2], ['outline', 'badge']);
+
+  const none = await runAttempts(
+    [{ steps: sampleSteps, attachments: sampleTrace }],
+    { highlight: 'none' },
+  );
+  assert.deepEqual(highlights(none.bundle), [
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+  ]);
+  assert.equal(none.assetFiles.length, 4);
+});
+
 test('Step Screenshots come from the trace of the attempt that is kept', async () => {
   const lastHasTrace = await runAttempts([
     { status: 'failed', retry: 0, steps: sampleSteps },

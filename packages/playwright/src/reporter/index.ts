@@ -2,10 +2,13 @@ import path from 'node:path';
 
 import type { Reporter, TestCase, TestResult } from '@playwright/test/reporter';
 import {
+  HighlightPlanner,
   QaInstructionsRecorder,
   QaInstructionsRun,
   SecretMasker,
+  StepScreenshotHighlighter,
   TestSelection,
+  type HighlightStyle,
   type MaskPattern,
   type TestSelectionOptions,
   writeBundle,
@@ -14,6 +17,7 @@ import {
 } from '@qa-instructions/core';
 
 import { AttemptTraces } from './attempt-traces.js';
+import { SharpScreenshotAnnotator } from './sharp-screenshot-annotator.js';
 import { PlaywrightStepTranslator } from './step-translator.js';
 
 export type QaInstructionsReporterOptions = {
@@ -36,6 +40,12 @@ export type QaInstructionsReporterOptions = {
    * always masked when the trace records DOM snapshots.
    */
   mask?: MaskPattern[];
+  /**
+   * How each Step Screenshot marks the element acted on: `outline`,
+   * `clickDot`, `badge` (the step number), `spotlight`, a list of these, or
+   * `none`. Default `['outline', 'clickDot']`.
+   */
+  highlight?: HighlightStyle;
 };
 
 /**
@@ -57,6 +67,11 @@ export default class QaInstructionsReporter implements Reporter {
       masker,
     ),
     private readonly traces = new AttemptTraces(),
+    private readonly highlighter = new StepScreenshotHighlighter(
+      new SharpScreenshotAnnotator(),
+      new HighlightPlanner(options.highlight),
+      (step, error) => this.warnHighlight(step.action, error),
+    ),
   ) {
     this.outputDir = options.outputDir ?? 'qa-runs';
     this.selection = new TestSelection(options.select);
@@ -82,7 +97,7 @@ export default class QaInstructionsReporter implements Reporter {
 
   /**
    * Writes one bundle per test once every attempt has been seen, with Step
-   * Screenshots from the trace of the attempt it came from.
+   * Screenshots from the trace of the attempt it came from, highlighted.
    */
   async onEnd(): Promise<void> {
     let results: QaInstructionsResult[] = [];
@@ -97,7 +112,9 @@ export default class QaInstructionsReporter implements Reporter {
           result.start.id,
           result.start.attempt,
         );
-        const { bundle, assets } = result.record(screenshots);
+        const { bundle, assets } = await this.highlighter.highlight(
+          result.record(screenshots),
+        );
         await writeBundle(
           path.join(this.outputDir, result.dirName),
           bundle,
@@ -107,6 +124,12 @@ export default class QaInstructionsReporter implements Reporter {
         this.warn(result.bundle.meta.title, error);
       }
     }
+  }
+
+  private warnHighlight(step: string, error: unknown): void {
+    console.warn(
+      `qa-instructions: could not highlight the screenshot for "${step}"; kept it unmarked: ${String(error)}`,
+    );
   }
 
   private warn(subject: string, error: unknown): void {

@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@qa-instructions/core": "workspace:*",
-    "fflate": "^0.8.3"
+    "fflate": "^0.8.3",
+    "sharp": "^0.35.4"
   },
   "peerDependencies": {
     "@playwright/test": ">=1.51.0"

@@ -93,6 +93,17 @@ for (const [version, path] of Object.entries(TRACES)) {
     assert.equal(source.capture(PRESS)?.box, undefined);
   });
 
+  test(`trace format ${version}: each capture carries its page's viewport`, async () => {
+    const source = await TraceScreenshotSource.open(path);
+
+    for (const ref of [NAVIGATE, FILL, CLICK, PRESS]) {
+      assert.deepEqual(source.capture(ref)?.viewport, {
+        width: 400,
+        height: 300,
+      });
+    }
+  });
+
   test(`trace format ${version}: Actions the trace has nothing for have no capture`, async () => {
     const source = await TraceScreenshotSource.open(path);
 

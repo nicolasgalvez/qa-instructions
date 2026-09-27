@@ -7,13 +7,20 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
   {
-    // The core is runner-independent (ADR 0001): no test runner, even for types.
+    // The core is runner-independent (ADR 0001): no test runner, even for
+    // types, and no drawing library (Highlights are drawn behind a port).
     files: ['packages/core/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
-          patterns: ['@playwright/*', 'playwright', 'playwright/*', '@jest/*'],
+          patterns: [
+            '@playwright/*',
+            'playwright',
+            'playwright/*',
+            '@jest/*',
+            'sharp',
+          ],
         },
       ],
     },

@@ -3,6 +3,7 @@ import type {
   QaBox,
   QaPoint,
   QaScreenshotMoment,
+  QaSize,
   ScreenshotSource,
 } from '@qa-instructions/core';
 
@@ -31,19 +32,26 @@ type CallRecord = {
   box?: QaBox;
   point?: QaPoint;
   passwordField?: boolean;
+  viewport?: QaSize;
 };
 
 /**
  * What the browser library recorded for each call: the per-action screen
  * snapshots (`snapshots.screen`) and the element box and point of input
  * actions, plus the link from the test runner's step ids to library calls.
+ * Each library trace file is one browser context, whose options give the
+ * viewport of every call in it.
  */
 class TraceCalls {
   private readonly callByStep = new Map<string, string>();
   private readonly records = new Map<string, CallRecord>();
+  private viewport?: QaSize;
 
-  constructor(events: TraceEvent[]) {
-    for (const event of events) this.add(event);
+  constructor(contexts: TraceEvent[][]) {
+    for (const events of contexts) {
+      this.viewport = undefined;
+      for (const event of events) this.add(event);
+    }
   }
 
   /** The library call made for a test runner step. */
@@ -55,6 +63,11 @@ class TraceCalls {
   private add(event: TraceEvent): void {
     if (event.type === 'frame-snapshot') {
       this.addSnapshot(event.snapshot);
+      return;
+    }
+    if (event.type === 'context-options') {
+      const options = this.isRecord(event.options) ? event.options : {};
+      this.viewport = this.size(options.viewport);
       return;
     }
     const callId = event.callId;
@@ -103,10 +116,18 @@ class TraceCalls {
   private record(callId: string): CallRecord {
     let record = this.records.get(callId);
     if (!record) {
-      record = { screenshots: [] };
+      record = { screenshots: [], viewport: this.viewport };
       this.records.set(callId, record);
     }
     return record;
+  }
+
+  private size(value: unknown): QaSize | undefined {
+    if (!this.isRecord(value)) return undefined;
+    const { width, height } = value;
+    return typeof width === 'number' && typeof height === 'number'
+      ? { width, height }
+      : undefined;
   }
 
   private box(value: unknown): QaBox | undefined {
@@ -163,7 +184,7 @@ export class TraceScreenshotSource implements ScreenshotSource {
     const calls = new TraceCalls(
       [...eventFiles]
         .filter(([name]) => name !== TEST_TRACE)
-        .flatMap(([, events]) => events),
+        .map(([, events]) => events),
     );
     const records = TraceScreenshotSource.actionSteps(testEvents).map(
       ({ ref, stepId }) => ({ ref, record: calls.forStep(stepId) }),
@@ -187,6 +208,7 @@ export class TraceScreenshotSource implements ScreenshotSource {
         box: record.box,
         point: record.point,
         passwordField: record.passwordField,
+        viewport: record.viewport,
       });
     }
     return new TraceScreenshotSource(captures);

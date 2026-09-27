@@ -1,0 +1,107 @@
+{
+  "bundleDirs": [
+    "moving-ui--register-a-warranty-from-the-menu",
+    "2x/moving-ui--register-a-warranty-from-the-menu"
+  ],
+  "viewport": { "width": 800, "height": 600 },
+  "minBytes": 2000,
+  "highlights": [
+    null,
+    ["outline", "clickDot"],
+    ["outline", "clickDot"],
+    ["outline", "clickDot"],
+    ["outline"],
+    null,
+    ["outline", "clickDot"]
+  ],
+  "steps": [
+    {
+      "action": "Open http://127.0.0.1:4321/store",
+      "moment": "after",
+      "probes": []
+    },
+    {
+      "action": "Click the **Menu** button",
+      "moment": "action",
+      "probes": [
+        { "name": "outline", "at": "outline", "rgb": [255, 0, 128] },
+        {
+          "name": "hamburger button",
+          "at": "inside",
+          "dx": 3,
+          "rgb": [68, 68, 68]
+        },
+        { "name": "click dot", "at": "clickPoint", "rgb": [255, 0, 128] }
+      ]
+    },
+    {
+      "action": "Click the **Warranty** link",
+      "moment": "action",
+      "probes": [
+        { "name": "outline", "at": "outline", "rgb": [255, 0, 128] },
+        {
+          "name": "slid-in menu link",
+          "at": "inside",
+          "dx": 6,
+          "rgb": [45, 91, 227]
+        },
+        { "name": "click dot", "at": "clickPoint", "rgb": [255, 0, 128] }
+      ]
+    },
+    {
+      "action": "Click the **Warranty** button",
+      "moment": "action",
+      "probes": [
+        { "name": "outline", "at": "outline", "rgb": [255, 0, 128] },
+        {
+          "name": "accordion trigger",
+          "at": "inside",
+          "dx": -6,
+          "rgb": [10, 125, 90]
+        },
+        { "name": "click dot", "at": "clickPoint", "rgb": [255, 0, 128] }
+      ]
+    },
+    {
+      "action": "Type **SN-1234** into **Serial number**",
+      "moment": "action",
+      "probes": [
+        { "name": "outline", "at": "outline", "rgb": [255, 0, 128] },
+        {
+          "name": "opened field",
+          "at": "inside",
+          "dx": 6,
+          "rgb": [255, 255, 255]
+        },
+        {
+          "name": "no click dot",
+          "at": "elementBoxCenter",
+          "rgb": [255, 255, 255]
+        }
+      ]
+    },
+    {
+      "action": "Press **Enter**",
+      "moment": "action",
+      "probes": []
+    },
+    {
+      "action": "Click the **Menu** button",
+      "moment": "action",
+      "probes": [
+        {
+          "name": "outline on the sticky header",
+          "at": "outline",
+          "rgb": [255, 0, 128]
+        },
+        {
+          "name": "hamburger button",
+          "at": "inside",
+          "dx": 3,
+          "rgb": [68, 68, 68]
+        },
+        { "name": "click dot", "at": "clickPoint", "rgb": [255, 0, 128] }
+      ]
+    }
+  ]
+}
