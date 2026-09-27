@@ -4,6 +4,8 @@ import type { Reporter, TestCase, TestResult } from '@playwright/test/reporter';
 import {
   bundleDirName,
   QaInstructionsRecorder,
+  TestSelection,
+  type TestSelectionOptions,
   writeBundle,
 } from '@qa-instructions/core';
 
@@ -12,6 +14,11 @@ import { PlaywrightStepTranslator } from './step-translator.js';
 export type QaInstructionsReporterOptions = {
   /** Where QA Instructions bundles are written. Default `qa-runs`. */
   outputDir?: string;
+  /**
+   * Limit which tests produce QA Instructions, by tag and by test file glob.
+   * Default: every test. Unselected tests still run and produce nothing.
+   */
+  select?: TestSelectionOptions;
 };
 
 /**
@@ -21,12 +28,14 @@ export type QaInstructionsReporterOptions = {
  */
 export default class QaInstructionsReporter implements Reporter {
   private readonly outputDir: string;
+  private readonly selection: TestSelection;
 
   constructor(
     options: QaInstructionsReporterOptions = {},
     private readonly translator = new PlaywrightStepTranslator(),
   ) {
     this.outputDir = options.outputDir ?? 'qa-runs';
+    this.selection = new TestSelection(options.select);
   }
 
   printsToStdio(): boolean {
@@ -35,6 +44,8 @@ export default class QaInstructionsReporter implements Reporter {
 
   async onTestEnd(test: TestCase, result: TestResult): Promise<void> {
     try {
+      if (!this.selection.includes(this.translator.testStart(test))) return;
+
       const recorder = new QaInstructionsRecorder();
       for (const event of this.translator.translate(test, result)) {
         recorder.handle(event);

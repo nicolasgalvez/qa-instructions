@@ -104,6 +104,10 @@ importers:
         version: 5.9.3
 
   packages/core:
+    dependencies:
+      minimatch:
+        specifier: ^10.2.6
+        version: 10.2.6
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
