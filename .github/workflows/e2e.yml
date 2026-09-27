@@ -34,12 +34,16 @@ jobs:
         working-directory: examples/verification
       - run: pnpm e2e
         working-directory: examples/verification
+      - run: pnpm e2e
+        working-directory: examples/derived-steps
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: qa-steps
-          path: examples/verification/qa-steps-out/
+          path: |
+            examples/verification/qa-steps-out/
+            examples/derived-steps/qa-steps-out/
 
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -48,4 +52,5 @@ jobs:
           path: |
             examples/verification/playwright-report/
             examples/verification/test-results/
+            examples/derived-steps/test-results/
           retention-days: 7

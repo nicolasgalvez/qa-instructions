@@ -1,5 +1,5 @@
 {
-  "name": "@qa-instructions/example-verification",
+  "name": "@qa-instructions/example-derived-steps",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,6 @@
     "@qa-instructions/cli": "workspace:*",
     "@qa-instructions/fixture-site": "workspace:*",
     "@qa-instructions/playwright": "workspace:*",
-    "@playwright/test": "^1.63.0",
-    "pngjs": "^7.0.0"
+    "@playwright/test": "^1.63.0"
   }
 }
