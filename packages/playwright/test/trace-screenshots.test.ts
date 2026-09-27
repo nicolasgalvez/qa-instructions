@@ -562,6 +562,27 @@ test('trace format 8: a fill whose smooth scroll is not known to have settled by
   assert.deepEqual(moments(source.capture(V8_SMOOTH_UNSETTLED_FILL)), []);
 });
 
+/**
+ * The gift-card page's fill on Playwright 1.56, followed only by a check of
+ * its value and a 400ms wait (viewport 800×600): nothing that follows logs
+ * whether the page is still. The recording paints frames until the trace
+ * ends, all while the fill's smooth scroll eases in; the last shows neither
+ * the form nor the field, and the wait's last DOM snapshot records the page
+ * scrolled on from where it was when the fill ended.
+ */
+const V8_SMOOTH_EXPECT_FILL = ActionRef.of(
+  4,
+  `Fill "3" getByLabel('Gift card quantity')`,
+);
+
+test('trace format 8: a fill whose smooth scroll no later snapshot shows had settled gets no screenshot', async () => {
+  const source = await TraceScreenshotSource.open(
+    fixture('v8-smooth-expect.zip'),
+  );
+  assert.ok(source.capture(V8_SMOOTH_EXPECT_FILL));
+  assert.deepEqual(moments(source.capture(V8_SMOOTH_EXPECT_FILL)), []);
+});
+
 test('trace format 8: a check Playwright skipped (already checked) gets no screenshot', async () => {
   // Playwright neither scrolled to the radio nor clicked it, so no frame is
   // known to show it: the only one by its end shows the top of the page.
