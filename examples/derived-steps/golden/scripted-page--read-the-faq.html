@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
-<title>Sign in with bad credentials</title>
+<title>Read the FAQ</title>
 <style>
 :root {
   color-scheme: light dark;
@@ -101,30 +101,21 @@ img {
 </head>
 <body>
 <main>
-<h1>Sign in with bad credentials</h1>
+<h1>Read the FAQ</h1>
 <ol start="1">
 <li>
-<p>Open http://127.0.0.1:4321/</p>
-<p><strong>Expected:</strong> The <strong>Fixture App</strong> heading is visible</p>
-<figure><img src="data:image/png;base64,…" alt="Step 1: Open http://127.0.0.1:4321/"></figure>
+<p>Open http://127.0.0.1:4321/faq</p>
+<figure><img src="data:image/png;base64,…" alt="Step 1: Open http://127.0.0.1:4321/faq"></figure>
 </li>
-<li>
-<p>Click the <strong>Sign in</strong> link</p>
-<p><strong>Expected:</strong> The page title is <strong>Sign in</strong>; <strong>Username</strong> is empty</p>
-<figure><img src="data:image/png;base64,…" alt="Step 2: Click the Sign in link"></figure>
+<li class="warning">
+<p><strong>Warning:</strong> The test changed the expandable section with a script instead of a user action. If the page does not match what comes next, change it by hand to continue.</p>
+<p><strong>Expected:</strong> <strong>Orders ship within 2 business days.</strong> is visible</p>
+<figure><img src="data:image/png;base64,…" alt="Step 2: The test changed the expandable section with a script instead of a user action. If the page does not match what comes next, change it by hand to continue."></figure>
 </li>
-<li>
-<p>Type <strong>demo-user</strong> into <strong>Username</strong></p>
-<figure><img src="data:image/png;base64,…" alt="Step 3: Type demo-user into Username"></figure>
-</li>
-<li>
-<p>Click the <strong>Submit bad credentials</strong> button</p>
-<p><strong>Expected:</strong> The page address contains <strong>login-error</strong>; <strong>Invalid credentials</strong> is visible; the <strong>Login failed</strong> heading is visible</p>
-<figure><img src="data:image/png;base64,…" alt="Step 4: Click the Submit bad credentials button"></figure>
-</li>
-<li>
-<p>Press <strong>Tab</strong></p>
-<figure><img src="data:image/png;base64,…" alt="Step 5: Press Tab"></figure>
+<li class="warning">
+<p><strong>Warning:</strong> The test clicked the <strong>Show contact details</strong> button with a script instead of a user action. Click it yourself to continue.</p>
+<p><strong>Expected:</strong> <strong>Email help@example.com</strong> is visible</p>
+<figure><img src="data:image/png;base64,…" alt="Step 3: The test clicked the Show contact details button with a script instead of a user action. Click it yourself to continue."></figure>
 </li>
 </ol>
 </main>

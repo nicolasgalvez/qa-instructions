@@ -1,0 +1,142 @@
+{
+  "title": "scripts",
+  "steps": [
+    {
+      "title": "Before Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"browser\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Launch browser",
+              "category": "pw:api"
+            }
+          ]
+        },
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create context",
+              "category": "pw:api"
+            }
+          ]
+        },
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create page",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Navigate to \"data:\"",
+      "category": "pw:api",
+      "location": {
+        "file": "scripts.spec.ts",
+        "line": 26,
+        "column": 14
+      }
+    },
+    {
+      "title": "Evaluate locator('details')",
+      "category": "pw:api",
+      "location": {
+        "file": "scripts.spec.ts",
+        "line": 28,
+        "column": 50
+      }
+    },
+    {
+      "title": "Expect \"toBe\"",
+      "category": "expect",
+      "location": {
+        "file": "scripts.spec.ts",
+        "line": 29,
+        "column": 20
+      }
+    },
+    {
+      "title": "Evaluate",
+      "category": "pw:api",
+      "location": {
+        "file": "scripts.spec.ts",
+        "line": 31,
+        "column": 14
+      }
+    },
+    {
+      "title": "Evaluate locator('details:not([open])')",
+      "category": "pw:api",
+      "location": {
+        "file": "scripts.spec.ts",
+        "line": 35,
+        "column": 6
+      }
+    },
+    {
+      "title": "Evaluate locator('details:not([open])')",
+      "category": "pw:api",
+      "location": {
+        "file": "scripts.spec.ts",
+        "line": 41,
+        "column": 6
+      }
+    },
+    {
+      "title": "Evaluate locator('#note')",
+      "category": "pw:api",
+      "location": {
+        "file": "scripts.spec.ts",
+        "line": 47,
+        "column": 6
+      }
+    },
+    {
+      "title": "Expect \"toBe\"",
+      "category": "expect",
+      "location": {
+        "file": "scripts.spec.ts",
+        "line": 48,
+        "column": 17
+      }
+    },
+    {
+      "title": "Click getByRole('button', { name: 'Save' })",
+      "category": "pw:api",
+      "location": {
+        "file": "scripts.spec.ts",
+        "line": 51,
+        "column": 52
+      }
+    },
+    {
+      "title": "After Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture"
+        },
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Close context",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

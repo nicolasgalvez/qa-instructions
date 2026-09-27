@@ -30,6 +30,20 @@ test('Read the FAQ', async ({ page }) => {
   await expect(page.getByText('Email help@example.com')).toBeVisible();
 });
 
+test('Open collapsed sections on a page without any', async ({ page }) => {
+  await page.goto('/');
+
+  // The same script as above, on a page with no collapsed sections: it
+  // changes nothing, so a trace shows no warning is needed.
+  await page
+    .locator('details:not([open])')
+    .evaluateAll((els) =>
+      els.forEach((d) => ((d as HTMLDetailsElement).open = true)),
+    );
+  await page.getByRole('link', { name: 'Sign in' }).click();
+  await expect(page).toHaveTitle('Sign in');
+});
+
 test('Subscribe to the newsletter', async ({ page }) => {
   await page.goto('/newsletter');
   await page.getByRole('button', { name: 'Subscribe' }).click({ force: true });

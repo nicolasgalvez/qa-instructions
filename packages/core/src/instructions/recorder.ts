@@ -95,10 +95,19 @@ type PendingStep = {
    */
   checks: CheckEvent[];
   failed?: boolean;
+  /**
+   * A script that may have changed the page: a warning step, unless what was
+   * recorded of the page says it changed nothing.
+   */
   warning?: boolean;
   approximate?: boolean;
   /** The Action's ref, for its Step Screenshot. */
   ref?: string;
+  /**
+   * For a collapsed group's step started after a warning step: the group's
+   * earlier step, which it continues if the warning steps between them go.
+   */
+  resumes?: PendingStep;
 };
 
 /**
@@ -106,7 +115,9 @@ type PendingStep = {
  * a QA Step per user Action, with the checks that follow it as the step's
  * Expected Result, grouped into Sections by the test's own groups. Test
  * plumbing is dropped, except a script that changed the page, which becomes
- * a warning step. Forced Actions are approximate.
+ * a warning step. Forced Actions are approximate. Whether a script changed
+ * the page, and whether an Action was forced, is decided once the screenshot
+ * source says what was recorded of the call (see ScriptChangeRule).
  *
  * A test that does not pass yields incomplete QA Instructions: the QA Steps
  * stop at the first failed Action or check, and the step it belongs to is
@@ -133,6 +144,8 @@ export class QaInstructionsRecorder implements TestEventSink {
   private readonly groups: string[] = [];
   /** The QA Step the open outermost group collapsed into, once it has one. */
   private collapsedStep?: PendingStep;
+  /** The open outermost group's QA Step that a warning step interrupted. */
+  private interruptedStep?: PendingStep;
   private start?: TestStartEvent;
   private end?: TestEndEvent;
   private stopped = false;
@@ -164,7 +177,10 @@ export class QaInstructionsRecorder implements TestEventSink {
         this.stopAt(event);
         break;
       case 'groupStart':
-        if (this.groups.length === 0) this.collapsedStep = undefined;
+        if (this.groups.length === 0) {
+          this.collapsedStep = undefined;
+          this.interruptedStep = undefined;
+        }
         this.groups.push(event.title);
         break;
       case 'groupEnd':
@@ -204,9 +220,7 @@ export class QaInstructionsRecorder implements TestEventSink {
       !this.end || this.end.status === 'passed' ? 'complete' : 'incomplete',
     );
 
-    this.steps.forEach((step, i) => {
-      const capture =
-        step.ref === undefined ? undefined : screenshots.capture(step.ref);
+    this.resolvedSteps(screenshots).forEach(({ step, capture }, i) => {
       const screenshot = this.picker.pick(capture?.screenshots ?? []);
       const asset = screenshot && this.screenshotAsset(i + 1, screenshot);
       if (asset) builder.addAsset(asset);
@@ -228,6 +242,52 @@ export class QaInstructionsRecorder implements TestEventSink {
       bundle: masker.maskBundle(builder.toBundle()),
       assets: builder.pendingAssets(),
     };
+  }
+
+  /**
+   * The QA Steps as the screenshot source's recording decides them: a
+   * warning step stays only if its script changed the page, and hands its
+   * checks to the step before it otherwise; a collapsed group's step it no
+   * longer interrupts joins the group's earlier step; an Action the
+   * recording says was forced is approximate. The pending steps are left
+   * as they are.
+   */
+  private resolvedSteps(
+    screenshots: ScreenshotSource,
+  ): { step: PendingStep; capture?: ActionCapture }[] {
+    const kept: { step: PendingStep; capture?: ActionCapture }[] = [];
+    const copies = new Map<PendingStep, PendingStep>();
+    for (const pending of this.steps) {
+      const capture =
+        pending.ref === undefined
+          ? undefined
+          : screenshots.capture(pending.ref);
+      const previous = kept.at(-1)?.step;
+      if (
+        pending.warning &&
+        !this.scriptChanges.changesPage(pending.action as ActionEvent, capture)
+      ) {
+        previous?.checks.push(...pending.checks);
+        continue;
+      }
+      if (
+        pending.resumes &&
+        previous &&
+        previous === copies.get(pending.resumes)
+      ) {
+        previous.url ??= pending.url;
+        if (pending.failed) previous.failed = true;
+        previous.checks.push(...pending.checks);
+        continue;
+      }
+      const step = { ...pending, checks: [...pending.checks] };
+      if (typeof step.action !== 'string' && !step.warning) {
+        step.approximate = capture?.forced ?? step.approximate;
+      }
+      copies.set(pending, step);
+      kept.push({ step, capture });
+    }
+    return kept;
   }
 
   /** What the test typed into fields the screenshot source saw were password fields. */
@@ -254,7 +314,7 @@ export class QaInstructionsRecorder implements TestEventSink {
 
   private onAction(event: ActionEvent): void {
     if (!this.isUserAction(event)) {
-      if (this.scriptChanges.changesPage(event)) this.warn(event);
+      if (this.scriptChanges.mayChangePage(event)) this.warn(event);
       return;
     }
 
@@ -285,6 +345,7 @@ export class QaInstructionsRecorder implements TestEventSink {
    * page the script left.
    */
   private warn(event: ActionEvent): void {
+    this.interruptedStep = this.collapsedStep ?? this.interruptedStep;
     this.collapsedStep = undefined;
     this.steps.push({
       action: event,
@@ -305,7 +366,12 @@ export class QaInstructionsRecorder implements TestEventSink {
     event: ActionEvent,
   ): void {
     if (!this.collapsedStep) {
-      this.collapsedStep = { action: title, checks: [] };
+      this.collapsedStep = {
+        action: title,
+        checks: [],
+        resumes: this.interruptedStep,
+      };
+      this.interruptedStep = undefined;
       this.steps.push(this.collapsedStep);
     }
     this.collapsedStep.url ??= url;

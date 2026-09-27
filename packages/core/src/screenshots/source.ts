@@ -76,6 +76,17 @@ export type ActionCapture = {
   element?: RecordedElement;
   /** The page's viewport when the screenshots were taken, in CSS pixels. */
   viewport?: QaSize;
+  /**
+   * Whether the page as recorded after the call (its DOM, form values, and
+   * scroll offsets) differs from the page as recorded before it. Undefined
+   * when the page was not recorded on both sides of the call.
+   */
+  pageChanged?: boolean;
+  /**
+   * Whether the call's recorded options forced it past the runner's usual
+   * checks, however the test built them. Undefined when not recorded.
+   */
+  forced?: boolean;
 };
 
 /**

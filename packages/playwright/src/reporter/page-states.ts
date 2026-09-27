@@ -123,18 +123,20 @@ type Moment = { name: string; time: number; frames: Map<string, NodeState> };
  * What a page's DOM snapshots (`snapshots.dom`, taken before, at the input
  * of, and after each call) record of it over time: its DOM, form values, and
  * scroll offsets. Says since when the page had been as it was at a given
- * snapshot, which tells whether a screen recording frame can show it.
+ * snapshot, which tells whether a screen recording frame can show it, and
+ * whether a call changed the page.
  */
 export class PageStates {
   private readonly frames = new Map<string, FrameSnapshots>();
   private readonly moments = new Map<string, Moment[]>();
 
   add(snapshot: Record<string, unknown>): void {
-    const { pageId, frameId, snapshotName, timestamp, html } = snapshot;
+    const { pageId, frameId, timestamp, html } = snapshot;
+    const snapshotName = PageStates.nameOf(snapshot);
     if (
       typeof pageId !== 'string' ||
       typeof frameId !== 'string' ||
-      typeof snapshotName !== 'string' ||
+      snapshotName === undefined ||
       typeof timestamp !== 'number'
     ) {
       return;
@@ -181,6 +183,39 @@ export class PageStates {
     snapshotName: string,
   ): number | undefined {
     return this.since(pageId, snapshotName, (state) => state.dom);
+  }
+
+  /**
+   * Whether the page's DOM, form values, or scroll offsets differ between
+   * before a call (`before@<callId>`) and after it (`after@<callId>`), or,
+   * with `untilNext`, the page's next snapshot after that (the next call's
+   * `before`), for work the call hands on untraced. Ignores which element
+   * Playwright marked as a call's target. Undefined without both snapshots.
+   */
+  changedBy(callId: string, untilNext = false): boolean | undefined {
+    for (const moments of this.moments.values()) {
+      const before = moments.find((m) => m.name === `before@${callId}`);
+      const at = moments.findIndex((m) => m.name === `after@${callId}`);
+      const after = moments[untilNext ? at + 1 : at];
+      if (before && at >= 0) {
+        return after === undefined
+          ? undefined
+          : this.pageState(before).dom !== this.pageState(after).dom;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * A snapshot's name, e.g. `before@call@12`. Playwright 1.53–1.62 write it
+   * as `snapshotName`; 1.63 writes the call and its `phase` instead.
+   */
+  private static nameOf(snapshot: Record<string, unknown>): string | undefined {
+    const { snapshotName, phase, callId } = snapshot;
+    if (typeof snapshotName === 'string') return snapshotName;
+    return typeof phase === 'string' && typeof callId === 'string'
+      ? `${phase}@${callId}`
+      : undefined;
   }
 
   private since(

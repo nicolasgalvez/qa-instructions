@@ -63,6 +63,12 @@ const PASSIVE_METHODS: ReadonlySet<unknown> = new Set([
   'content',
 ]);
 
+/**
+ * The library call a `locator.evaluate()` step is traced as: it finds the
+ * element, and the script runs after it, untraced.
+ */
+const UNTRACED_SCRIPT_LOOKUP = 'waitForSelector';
+
 /** The log line a pointer action writes as it starts scrolling to its element. */
 const SCROLL_LOG = /scrolling into view/;
 
@@ -77,6 +83,10 @@ type CallRecord = {
   /** Per-action screen snapshots (`snapshots.screen`, Playwright 1.63+). */
   screenshots: ImageRef[];
   method?: unknown;
+  /** The call's recorded options include `force: true`. */
+  forced?: boolean;
+  /** The call's library call id, which names its DOM snapshots. */
+  callId?: string;
   /** The selector the call looked its element up by. */
   selector?: string;
   pageId?: string;
@@ -143,6 +153,20 @@ class TraceCalls {
       marks: record.point !== undefined || record.box !== undefined,
       nextChange: this.nextChange(record),
     };
+  }
+
+  /**
+   * Whether the page's DOM snapshots show it changed during the call.
+   * `locator.evaluate()` is traced as the `waitForSelector` that finds its
+   * element; the script then runs untraced, so its effect shows only by the
+   * page's next snapshot.
+   */
+  pageChanged(record: CallRecord): boolean | undefined {
+    if (record.callId === undefined) return undefined;
+    return this.pages.changedBy(
+      record.callId,
+      record.method === UNTRACED_SCRIPT_LOOKUP,
+    );
   }
 
   /**
@@ -218,6 +242,8 @@ class TraceCalls {
         );
         Object.assign(this.record(callId), {
           method: event.method,
+          callId,
+          forced: this.isRecord(event.params) && event.params.force === true,
           pageId: typeof event.pageId === 'string' ? event.pageId : undefined,
           startTime: this.number(event.startTime),
           selector:
@@ -362,8 +388,9 @@ class TraceCalls {
  * Screenshot-source adapter over a Playwright trace (`trace.zip`). Joins each
  * `pw:api` step in the test runner's trace to the library call it made, and
  * returns that call's screen snapshots (or, without them, a frame of the
- * screen recording), element box, and click point. Also says what each
- * check checked (see TraceChecks).
+ * screen recording), element box, and click point, whether its DOM
+ * snapshots show the page changed during it, and whether its options forced
+ * it. Also says what each check checked (see TraceChecks).
  * Never throws: an unreadable or unsupported trace gives no screenshots and
  * says why in `problem`.
  */
@@ -440,6 +467,8 @@ export class TraceScreenshotSource implements ScreenshotSource {
         passwordField: record.passwordField,
         element: record.element,
         viewport: record.viewport,
+        pageChanged: calls.pageChanged(record),
+        forced: record.forced,
       });
     }
     const checks = new TraceChecks(testEvents, (stepId) => {

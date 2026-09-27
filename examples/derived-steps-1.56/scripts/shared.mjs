@@ -27,6 +27,7 @@ export const GOLDENS = [
   'sign-in--sign-in-with-bad-credentials',
   'grouped--sign-in-with-good-credentials',
   'scripted-page--read-the-faq',
+  'scripted-page--open-collapsed-sections-on-a-page-without-any',
   'scripted-page--subscribe-to-the-newsletter',
   'login--sign-in-with-a-password',
   'moving-ui--register-a-warranty-from-the-menu',
