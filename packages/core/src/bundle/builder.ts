@@ -42,6 +42,9 @@ export function createBundleBuilder(): BundleBuilder {
         failed: input.failed || undefined,
         warning: input.warning || undefined,
         approximate: input.approximate || undefined,
+        screenshotMoment: input.screenshotMoment,
+        elementBox: input.elementBox,
+        clickPoint: input.clickPoint,
       };
       steps.push(step);
       return step;

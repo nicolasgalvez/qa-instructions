@@ -54,3 +54,11 @@ export const GOLDENS = [
     golden: 'golden/scripted-page--subscribe-to-the-newsletter.txt',
   },
 ];
+
+/**
+ * Hand-written expectations for each bundle's Step Screenshots: one per QA
+ * Step, taken at the expected moment, with pixel probes on known elements.
+ */
+export const SCREENSHOT_GOLDENS = [
+  'golden/sign-in--sign-in-with-bad-credentials.screenshots.json',
+];

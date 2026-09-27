@@ -5,6 +5,18 @@ export type QaAsset = {
   sha256?: string;
 };
 
+/** A point on the page, in CSS pixels from the viewport's top-left corner. */
+export type QaPoint = { x: number; y: number };
+
+/** A rectangle on the page, in CSS pixels from the viewport's top-left corner. */
+export type QaBox = { x: number; y: number; width: number; height: number };
+
+/**
+ * When a Step Screenshot was taken, relative to its Action: at the moment of
+ * the Action (preferred), just after it, or just before it.
+ */
+export type QaScreenshotMoment = 'action' | 'after' | 'before';
+
 export type QaStep = {
   index: number;
   action: string;
@@ -19,6 +31,12 @@ export type QaStep = {
   warning?: boolean;
   /** The Action was forced past the runner's usual checks; its Highlight may not line up. */
   approximate?: boolean;
+  /** When the step's Step Screenshot (its first asset) was taken. */
+  screenshotMoment?: QaScreenshotMoment;
+  /** The element the Action touched, at the moment of the Action. */
+  elementBox?: QaBox;
+  /** Where the Action clicked or tapped. */
+  clickPoint?: QaPoint;
 };
 
 export type QaRunBundle = {
@@ -48,16 +66,7 @@ export type QaGuideOptions = {
   prerequisite?: string;
 };
 
-export type QaStepInput = {
-  action: string;
-  expected?: string;
-  url?: string;
-  assetIds?: string[];
-  section?: string[];
-  failed?: boolean;
-  warning?: boolean;
-  approximate?: boolean;
-};
+export type QaStepInput = Omit<QaStep, 'index'>;
 
 export type QaAssetInput = {
   id: string;

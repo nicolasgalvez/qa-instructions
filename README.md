@@ -4,7 +4,7 @@ Turns what your existing Playwright tests already do into QA Instructions: steps
 
 ## Setup
 
-Add the reporter to `playwright.config.ts`:
+Add the reporter, and the trace setting for Step Screenshots, to `playwright.config.ts`:
 
 ```typescript
 import { defineConfig } from '@playwright/test';
@@ -14,6 +14,10 @@ export default defineConfig({
     ['list'],
     ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs' }],
   ],
+  use: {
+    // Step Screenshots (Playwright 1.63+): a screenshot of the page per action.
+    trace: { mode: 'on', snapshots: { screen: true } },
+  },
 });
 ```
 
@@ -21,7 +25,7 @@ That is the whole setup. Run your tests as usual (`npx playwright test`); the re
 
 `@playwright/test` is a peer dependency used for types only, so the package always runs against your project's own Playwright and never loads a second copy.
 
-Step Screenshots are not produced yet. When they are, they will come from Playwright's trace and need one `trace` setting in the same config.
+With the trace setting on, each QA Step gets a Step Screenshot of the page at the moment of its Action, saved in the bundle's `assets/` and listed in the step's `assetIds`. The element acted on (`elementBox`) and, for clicks, the click point (`clickPoint`) are recorded on the step in viewport CSS pixels. Without the setting, QA Steps are text only.
 
 ## What you get
 
@@ -85,11 +89,11 @@ Unit CI runs `packages/*` tests only; Playwright browser tests stay in the E2E w
 
 All examples are unmodified Playwright tests with the reporter added to their config.
 
-| Example                  | Purpose                                                          |
-| ------------------------ | ---------------------------------------------------------------- |
-| `examples/verification`  | Deterministic e2e: golden bundle and QA Steps for a test-id flow |
-| `examples/derived-steps` | Role/label locators, helper functions, and dropped test plumbing |
-| `examples/basic`         | Optional smoke against playwright.dev                            |
+| Example                  | Purpose                                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------------------- |
+| `examples/verification`  | Deterministic e2e: golden bundle and QA Steps for a test-id flow                               |
+| `examples/derived-steps` | Role/label locators, helper functions, dropped test plumbing, and Step Screenshot pixel probes |
+| `examples/basic`         | Optional smoke against playwright.dev                                                          |
 
 ```bash
 # Full pipeline verification (recommended)

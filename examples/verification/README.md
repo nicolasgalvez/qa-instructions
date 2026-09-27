@@ -9,7 +9,7 @@ Deterministic e2e for the capture → render pipeline.
 3. **Render** — produces pasteable QA Steps in `qa-steps-out/`
 4. **Golden verification** — the bundle (normalized) and the QA Steps text must equal `golden/`
 
-Step Screenshots are not produced yet, so there are no screenshot checks.
+This example runs without the trace setting, so its QA Steps are text only. Step Screenshot checks live in `examples/derived-steps`.
 
 ## Run locally
 

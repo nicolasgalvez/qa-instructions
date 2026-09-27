@@ -88,6 +88,11 @@ export type ActionEvent = {
    * expression, returned). Undefined when the runner cannot tell.
    */
   resultUsed?: boolean;
+  /**
+   * The runner adapter's own reference to this Action, opaque to the core.
+   * The ScreenshotSource uses it to find the Action's Step Screenshot.
+   */
+  ref?: string;
 };
 
 export type CheckEvent = {
