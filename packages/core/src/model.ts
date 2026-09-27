@@ -35,6 +35,8 @@ export type QaStep = {
   section?: string[];
   /** True on the QA Step where the test failed. */
   failed?: boolean;
+  /** A soft check in the step's Expected Result failed; the test went on. */
+  checkFailed?: boolean;
   /** The test changed the page by script here; the tester may need to act by hand. Has no Highlight. */
   warning?: boolean;
   /** The Action was forced past the runner's usual checks; its Highlight may not line up. */
@@ -63,7 +65,7 @@ export type QaRunBundle = {
     capturedAt: string;
     /**
      * `incomplete`: derived from a test that did not pass, so the QA Steps
-     * stop where it failed.
+     * stop where it failed, or flag where its soft checks failed.
      */
     status: 'complete' | 'incomplete';
   };

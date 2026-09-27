@@ -124,6 +124,11 @@ export type CheckEvent = {
   /** True when this check is where the test failed. */
   failed?: boolean;
   /**
+   * A soft check: when it fails, the test goes on, e.g. Playwright's
+   * `expect.soft`.
+   */
+  soft?: boolean;
+  /**
    * The runner adapter's own reference to this check, opaque to the core.
    * The ScreenshotSource may know what the check checked by it.
    */

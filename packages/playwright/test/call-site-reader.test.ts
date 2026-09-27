@@ -217,6 +217,26 @@ test('a check split over lines, negated, or soft is read back to expect()', () =
   );
 });
 
+test('a check reads whether it is soft from the source', () => {
+  const softOf = (source: string, matcher: string) =>
+    readCheck(source, matcher)?.soft;
+  assert.equal(
+    softOf(
+      `  await expect.soft(page, 'page title').toHaveTitle('Hi');`,
+      'toHaveTitle',
+    ),
+    true,
+  );
+  assert.equal(
+    softOf(`  await expect(page).toHaveTitle('Hi');`, 'toHaveTitle'),
+    false,
+  );
+  assert.equal(
+    softOf(`  await expect.poll(() => count).toBe(3);`, 'toBe'),
+    false,
+  );
+});
+
 test('a check whose expected value is not a literal has none', () => {
   assert.deepEqual(
     checkSite(`  await expect(page).toHaveURL(/login-error/);`, 'toHaveURL'),

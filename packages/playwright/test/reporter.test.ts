@@ -165,6 +165,88 @@ test('a failed check marks its QA Step as the failing step', async () => {
   );
 });
 
+test('a failed soft check flags its QA Step and the later QA Steps still follow', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'qa-spec-'));
+  const file = path.join(dir, 'soft.spec.ts');
+  const lines = [
+    `test('Soft', async ({ page }) => {`,
+    `  await expect.soft(page, 'page title').toHaveTitle('Sign in');`,
+    `});`,
+  ];
+  await writeFile(file, lines.join('\n'));
+  try {
+    const { bundle } = await runAttempts([
+      {
+        status: 'failed',
+        steps: [
+          navigate,
+          // Playwright titles a soft check `Expect "soft <matcher>"`...
+          {
+            category: 'expect',
+            title: 'Expect "soft toHaveTitle"',
+            params: { expected: 'Home' },
+            error: { message: 'Expected Home' },
+          },
+          clickSignIn,
+          // ...unless the test gave it a message: then only the source says.
+          {
+            category: 'expect',
+            title: 'page title',
+            params: { expected: 'Sign in' },
+            error: { message: 'Expected Sign in' },
+            location: {
+              file,
+              line: 2,
+              column: lines[1].indexOf('toHaveTitle') + 1,
+            },
+          },
+          { ...navigate, subtitle: '/cart', params: { url: '/cart' } },
+        ],
+      },
+    ]);
+    assert.equal(bundle.meta.status, 'incomplete');
+    assert.deepEqual(
+      bundle.steps.map(({ expected, failed, checkFailed }) => ({
+        expected,
+        failed,
+        checkFailed,
+      })),
+      [
+        {
+          expected: 'The page title is **Home**',
+          failed: undefined,
+          checkFailed: true,
+        },
+        {
+          expected: 'The page title is **Sign in**',
+          failed: undefined,
+          checkFailed: true,
+        },
+        { expected: undefined, failed: undefined, checkFailed: undefined },
+      ],
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('a skipped test yields no QA Instructions', async () => {
+  const out = await mkdtemp(path.join(tmpdir(), 'qa-reporter-'));
+  try {
+    const reporter = new QaInstructionsReporter({ outputDir: out });
+    await reporter.onTestEnd(mockTestCase(), {
+      status: 'skipped',
+      retry: 0,
+      attachments: [],
+      steps: [step(navigate)],
+    } as unknown as TestResult);
+    await reporter.onEnd();
+    assert.deepEqual(await readdir(out).catch(() => []), []);
+  } finally {
+    await rm(out, { recursive: true, force: true });
+  }
+});
+
 test('an error thrown outside any browser call still ends the QA Steps', async () => {
   const { bundle } = await runAttempts([
     {

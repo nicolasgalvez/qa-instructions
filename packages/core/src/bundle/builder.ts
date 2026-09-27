@@ -40,6 +40,7 @@ export function createBundleBuilder(): BundleBuilder {
         assetIds: input.assetIds,
         section: input.section,
         failed: input.failed || undefined,
+        checkFailed: input.checkFailed || undefined,
         warning: input.warning || undefined,
         approximate: input.approximate || undefined,
         screenshotMoment: input.screenshotMoment,

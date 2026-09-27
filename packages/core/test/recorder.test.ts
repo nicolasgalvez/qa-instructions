@@ -172,6 +172,103 @@ test('incomplete QA Instructions say where the test failed', () => {
   );
 });
 
+const softFailedSteps = (bundle: QaRunBundle) =>
+  bundle.steps.filter((step) => step.checkFailed).map((step) => step.index);
+
+test('a failed soft check flags its QA Step and the later QA Steps still follow', () => {
+  const bundle = recordFailure(
+    { type: 'action', kind: 'navigate', url: '/' },
+    {
+      type: 'check',
+      matcher: 'toHaveTitle',
+      negated: false,
+      subject: 'page',
+      expected: 'Home',
+      failed: true,
+      soft: true,
+    },
+    { type: 'action', kind: 'reload' },
+    {
+      type: 'check',
+      matcher: 'toHaveTitle',
+      negated: false,
+      subject: 'page',
+      expected: 'Home',
+    },
+  );
+  assert.equal(bundle.meta.status, 'incomplete');
+  assert.deepEqual(
+    bundle.steps.map(({ action, expected }) => ({ action, expected })),
+    [
+      {
+        action: 'Open http://127.0.0.1:4321/',
+        expected: 'The page title is **Home**',
+      },
+      { action: 'Reload the page', expected: 'The page title is **Home**' },
+    ],
+  );
+  assert.deepEqual(softFailedSteps(bundle), [1]);
+  assert.deepEqual(failedSteps(bundle), []);
+});
+
+test('a failure after a failed soft check still ends the QA Steps there', () => {
+  const bundle = recordFailure(
+    { type: 'action', kind: 'navigate', url: '/' },
+    {
+      type: 'check',
+      matcher: 'toHaveTitle',
+      negated: false,
+      subject: 'page',
+      expected: 'Home',
+      failed: true,
+      soft: true,
+    },
+    { type: 'action', kind: 'reload', failed: true },
+    { type: 'action', kind: 'goBack' },
+  );
+  assert.deepEqual(
+    bundle.steps.map((step) => step.action),
+    ['Open http://127.0.0.1:4321/', 'Reload the page'],
+  );
+  assert.deepEqual(softFailedSteps(bundle), [1]);
+  assert.deepEqual(failedSteps(bundle), [2]);
+});
+
+test('incomplete QA Instructions say where a soft check failed', () => {
+  assert.equal(
+    renderQaSteps(
+      recordFailure(
+        { type: 'action', kind: 'navigate', url: '/' },
+        {
+          type: 'check',
+          matcher: 'toHaveTitle',
+          negated: false,
+          subject: 'page',
+          expected: 'Home',
+          failed: true,
+          soft: true,
+        },
+        { type: 'action', kind: 'reload' },
+      ),
+    ),
+    '**Incomplete:** a check failed at step 1; the test went on, so the later steps are all here.\n' +
+      '\n' +
+      '1. Open http://127.0.0.1:4321/ — The page title is **Home** (**check failed here**)\n' +
+      '2. Reload the page\n',
+  );
+});
+
+test('a recorder knows whether its test was skipped', () => {
+  const recorder = new QaInstructionsRecorder();
+  recorder.handle(start);
+  recorder.handle({ type: 'testEnd', status: 'skipped' });
+  assert.equal(recorder.skipped, true);
+  const ran = new QaInstructionsRecorder();
+  ran.handle(start);
+  ran.handle(passed);
+  assert.equal(ran.skipped, false);
+});
+
 test('opening a URL is a QA Step with the full URL', () => {
   const bundle = record({ type: 'action', kind: 'navigate', url: '/login' });
   assert.equal(bundle.steps.length, 1);

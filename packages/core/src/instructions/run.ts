@@ -24,7 +24,7 @@ type RecordedTest = {
 /**
  * Consumes the event streams of a whole test run, one test attempt after
  * another, and keeps one set of QA Instructions per test: the one from its
- * last attempt.
+ * last attempt, unless that attempt was skipped.
  */
 export class QaInstructionsRun implements TestEventSink {
   private readonly tests = new Map<string, RecordedTest>();
@@ -51,9 +51,14 @@ export class QaInstructionsRun implements TestEventSink {
     }
   }
 
-  /** QA Instructions for every test seen, in the order tests first ended. */
+  /**
+   * QA Instructions for every test seen, in the order tests first ended,
+   * except tests whose last attempt was skipped: they have none.
+   */
   results(): QaInstructionsResult[] {
-    const tests = [...this.tests.values()];
+    const tests = [...this.tests.values()].filter(
+      ({ recorder }) => !recorder.skipped,
+    );
     const names = this.namer.names(
       tests.map(({ start }) => ({
         file: start.file ?? '',

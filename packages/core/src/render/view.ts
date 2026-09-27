@@ -9,6 +9,7 @@ export const QaWording = {
   approximate:
     'approximate: the test forced this Action past its usual checks, so its highlight may not line up',
   failed: 'test failed here',
+  checkFailed: 'check failed here',
 } as const;
 
 /** A QA Step's Step Screenshot, with alt text taken from its Action. */
@@ -21,7 +22,8 @@ export type QaStepView = {
   expected?: string;
   warning: boolean;
   approximate: boolean;
-  failed: boolean;
+  /** What failed on this step, worded: the test, or else a soft check. */
+  failure?: string;
   screenshot?: StepScreenshotView;
 };
 
@@ -61,12 +63,16 @@ export class QaInstructionsView {
     );
   }
 
-  /** Where an incomplete test stopped. */
+  /** Where an incomplete test stopped, or where its first soft check failed. */
   private static incompleteNote(steps: QaStep[]): string {
     const failing = steps.find((step) => step.failed);
+    const checkFailing = steps.find((step) => step.checkFailed);
     const last = steps.at(-1);
     if (failing) {
       return `the test failed at step ${failing.index}, so any later steps are missing.`;
+    }
+    if (checkFailing) {
+      return `a check failed at step ${checkFailing.index}; the test went on, so the later steps are all here.`;
     }
     if (last) {
       return `the test failed after step ${last.index}, so any later steps are missing.`;
@@ -105,7 +111,11 @@ export class QaInstructionsView {
       expected: step.expected,
       warning: step.warning ?? false,
       approximate: step.approximate ?? false,
-      failed: step.failed ?? false,
+      failure: step.failed
+        ? QaWording.failed
+        : step.checkFailed
+          ? QaWording.checkFailed
+          : undefined,
       screenshot: asset
         ? {
             asset,

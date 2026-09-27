@@ -29,7 +29,7 @@ export class TextRenderer {
     const warning = step.warning ? `${QaWording.warning}: ` : '';
     const approximate = step.approximate ? ` (${QaWording.approximate})` : '';
     const expected = step.expected ? ` — ${step.expected}` : '';
-    const failed = step.failed ? ` (**${QaWording.failed}**)` : '';
+    const failed = step.failure ? ` (**${step.failure}**)` : '';
     return `${step.number}. ${warning}${step.action}${approximate}${expected}${failed}`;
   }
 }

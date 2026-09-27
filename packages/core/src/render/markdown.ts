@@ -68,8 +68,8 @@ export class MarkdownRenderer {
         `**${QaWording.expected}:** ${InlineMarkup.toMarkdown(step.expected)}`,
       );
     }
-    if (step.failed) {
-      paragraphs[paragraphs.length - 1] += ` (**${QaWording.failed}**)`;
+    if (step.failure) {
+      paragraphs[paragraphs.length - 1] += ` (**${step.failure}**)`;
     }
 
     const src = step.screenshot && this.images?.src(step.screenshot.asset);
