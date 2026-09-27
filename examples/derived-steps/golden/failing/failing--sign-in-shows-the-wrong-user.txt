@@ -1,0 +1,6 @@
+**Incomplete:** the test failed at step 4, so any later steps are missing.
+
+1. Open http://127.0.0.1:4321/
+2. Click the **Sign in** link
+3. Type **demo-user** into **Username**
+4. Click the **Submit good credentials** link — The **welcome message** element shows **Logged in as admin** (**test failed here**)

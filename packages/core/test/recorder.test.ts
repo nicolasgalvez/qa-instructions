@@ -42,11 +42,133 @@ test('QA Instructions are titled after the test and record its source', () => {
   });
 });
 
-test('a test that does not pass is marked failed', () => {
+function recordFailure(...events: TestEvent[]): QaRunBundle {
   const recorder = new QaInstructionsRecorder();
-  recorder.handle(start);
-  recorder.handle({ type: 'testEnd', status: 'failed' });
-  assert.equal(recorder.toBundle().meta.status, 'failed');
+  for (const event of [
+    start,
+    ...events,
+    { type: 'testEnd', status: 'failed' } as TestEvent,
+  ]) {
+    recorder.handle(event);
+  }
+  return recorder.toBundle();
+}
+
+const failedSteps = (bundle: QaRunBundle) =>
+  bundle.steps.filter((step) => step.failed).map((step) => step.index);
+
+test('a test that does not pass is marked incomplete', () => {
+  for (const status of ['failed', 'timedOut', 'interrupted'] as const) {
+    const recorder = new QaInstructionsRecorder();
+    recorder.handle(start);
+    recorder.handle({ type: 'testEnd', status });
+    assert.equal(recorder.toBundle().meta.status, 'incomplete');
+  }
+});
+
+test('a failed Action is the last QA Step and is marked as the failing step', () => {
+  const bundle = recordFailure(
+    { type: 'action', kind: 'navigate', url: '/' },
+    {
+      type: 'action',
+      kind: 'click',
+      target: { by: 'role', role: 'link', name: 'Sign in' },
+      failed: true,
+    },
+    // After-hooks and anything else after the failure are not QA Steps.
+    { type: 'action', kind: 'reload' },
+    {
+      type: 'check',
+      matcher: 'toBeVisible',
+      negated: false,
+      subject: 'element',
+      target: { by: 'text', value: 'Hello' },
+    },
+  );
+  assert.equal(bundle.meta.status, 'incomplete');
+  assert.deepEqual(
+    bundle.steps.map((step) => step.action),
+    ['Open http://127.0.0.1:4321/', 'Click the **Sign in** link'],
+  );
+  assert.deepEqual(failedSteps(bundle), [2]);
+});
+
+test('a failed check marks the QA Step whose Expected Result it is', () => {
+  const bundle = recordFailure(
+    { type: 'action', kind: 'navigate', url: '/' },
+    {
+      type: 'check',
+      matcher: 'toHaveTitle',
+      negated: false,
+      subject: 'page',
+      expected: 'Home',
+      failed: true,
+    },
+    { type: 'action', kind: 'reload' },
+  );
+  assert.deepEqual(
+    bundle.steps.map(({ action, expected }) => ({ action, expected })),
+    [
+      {
+        action: 'Open http://127.0.0.1:4321/',
+        expected: 'The page title is **Home**',
+      },
+    ],
+  );
+  assert.deepEqual(failedSteps(bundle), [1]);
+});
+
+test('a failure a tester cannot see ends the QA Steps without marking one', () => {
+  const bundle = recordFailure(
+    { type: 'action', kind: 'navigate', url: '/' },
+    { type: 'action', kind: 'script', failed: true },
+    { type: 'action', kind: 'reload' },
+  );
+  assert.equal(bundle.meta.status, 'incomplete');
+  assert.deepEqual(
+    bundle.steps.map((step) => step.action),
+    ['Open http://127.0.0.1:4321/'],
+  );
+  assert.deepEqual(failedSteps(bundle), []);
+});
+
+test('a test that fails before any Action is incomplete with no QA Steps', () => {
+  const bundle = recordFailure(
+    { type: 'action', kind: 'setup', failed: true },
+    { type: 'action', kind: 'navigate', url: '/' },
+  );
+  assert.equal(bundle.meta.status, 'incomplete');
+  assert.deepEqual(bundle.steps, []);
+});
+
+test('incomplete QA Instructions say where the test failed', () => {
+  assert.equal(
+    renderQaSteps(
+      recordFailure(
+        { type: 'action', kind: 'navigate', url: '/' },
+        { type: 'action', kind: 'reload', failed: true },
+      ),
+    ),
+    '**Incomplete:** the test failed at step 2, so any later steps are missing.\n' +
+      '\n' +
+      '1. Open http://127.0.0.1:4321/\n' +
+      '2. Reload the page (**test failed here**)\n',
+  );
+  assert.equal(
+    renderQaSteps(
+      recordFailure(
+        { type: 'action', kind: 'navigate', url: '/' },
+        { type: 'action', kind: 'wait', failed: true },
+      ),
+    ),
+    '**Incomplete:** the test failed after step 1, so any later steps are missing.\n' +
+      '\n' +
+      '1. Open http://127.0.0.1:4321/\n',
+  );
+  assert.equal(
+    renderQaSteps(recordFailure()),
+    '**Incomplete:** the test failed before its first step.\n',
+  );
 });
 
 test('opening a URL is a QA Step with the full URL', () => {

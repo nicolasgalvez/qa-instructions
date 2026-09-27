@@ -16,7 +16,14 @@ type StepSpec = {
   title: string;
   subtitle?: string;
   params?: Record<string, unknown>;
+  error?: { message: string };
   steps?: StepSpec[];
+};
+
+type Attempt = {
+  status?: TestResult['status'];
+  retry?: number;
+  steps: StepSpec[];
 };
 
 function step(spec: StepSpec): TestStep {
@@ -28,6 +35,7 @@ function step(spec: StepSpec): TestStep {
 
 function mockTestCase(tags: string[] = []): TestCase {
   return {
+    id: 'test-1',
     title: 'Sign in with bad credentials',
     tags,
     location: { file: '/proj/tests/sign-in.spec.ts', line: 1, column: 1 },
@@ -40,28 +48,154 @@ function mockTestCase(tags: string[] = []): TestCase {
   } as unknown as TestCase;
 }
 
-async function runReporter(
-  steps: StepSpec[],
+async function runAttempts(
+  attempts: Attempt[],
   options: QaInstructionsReporterOptions = {},
-): Promise<QaRunBundle> {
+): Promise<{
+  dirs: string[];
+  bundle: QaRunBundle;
+}> {
   const out = await mkdtemp(path.join(tmpdir(), 'qa-reporter-'));
   try {
     const reporter = new QaInstructionsReporter({ ...options, outputDir: out });
-    await reporter.onTestEnd(mockTestCase(), {
-      status: 'passed',
-      retry: 0,
-      attachments: [],
-      steps: steps.map(step),
-    } as unknown as TestResult);
+    for (const { status = 'passed', retry = 0, steps } of attempts) {
+      await reporter.onTestEnd(mockTestCase(), {
+        status,
+        retry,
+        attachments: [],
+        steps: steps.map(step),
+      } as unknown as TestResult);
+    }
+    await reporter.onEnd();
     const raw = await readFile(
       path.join(out, 'sign-in--sign-in-with-bad-credentials', 'bundle.json'),
       'utf8',
     );
-    return JSON.parse(raw) as QaRunBundle;
+    return {
+      dirs: await readdir(out),
+      bundle: JSON.parse(raw) as QaRunBundle,
+    };
   } finally {
     await rm(out, { recursive: true, force: true });
   }
 }
+
+async function runReporter(
+  steps: StepSpec[],
+  options: QaInstructionsReporterOptions = {},
+): Promise<QaRunBundle> {
+  return (await runAttempts([{ steps }], options)).bundle;
+}
+
+const navigate: StepSpec = {
+  category: 'pw:api',
+  title: 'Navigate',
+  subtitle: '/',
+  params: { url: '/' },
+};
+const clickSignIn: StepSpec = {
+  category: 'pw:api',
+  title: 'Click',
+  subtitle: "getByRole('link', { name: 'Sign in' })",
+  params: { locator: "getByRole('link', { name: 'Sign in' })" },
+};
+const closeContext: StepSpec = {
+  category: 'hook',
+  title: 'After Hooks',
+  steps: [{ category: 'pw:api', title: 'Close context' }],
+};
+
+test('a failed test yields QA Steps up to the failing step, marked incomplete', async () => {
+  const { bundle } = await runAttempts([
+    {
+      status: 'failed',
+      steps: [
+        navigate,
+        {
+          category: 'test.step',
+          title: 'sign in',
+          error: { message: 'Timeout' },
+          steps: [{ ...clickSignIn, error: { message: 'Timeout' } }],
+        },
+        closeContext,
+      ],
+    },
+  ]);
+  assert.equal(bundle.meta.status, 'incomplete');
+  assert.deepEqual(
+    bundle.steps.map(({ index, action, failed }) => ({
+      index,
+      action,
+      failed,
+    })),
+    [
+      { index: 1, action: 'Open http://127.0.0.1:4321/', failed: undefined },
+      { index: 2, action: 'Click the **Sign in** link', failed: true },
+    ],
+  );
+});
+
+test('a failed check marks its QA Step as the failing step', async () => {
+  const { bundle } = await runAttempts([
+    {
+      status: 'failed',
+      steps: [
+        navigate,
+        {
+          category: 'expect',
+          title: 'Expect "toHaveTitle"',
+          params: { expected: 'Home' },
+          error: { message: 'Expected Home' },
+        },
+        clickSignIn,
+      ],
+    },
+  ]);
+  assert.deepEqual(
+    bundle.steps.map(({ expected, failed }) => ({ expected, failed })),
+    [{ expected: 'The page title is **Home**', failed: true }],
+  );
+});
+
+test('an error thrown outside any browser call still ends the QA Steps', async () => {
+  const { bundle } = await runAttempts([
+    {
+      status: 'failed',
+      steps: [
+        {
+          category: 'test.step',
+          title: 'open the app',
+          error: { message: 'boom' },
+          steps: [navigate],
+        },
+        {
+          category: 'hook',
+          title: 'After Hooks',
+          steps: [clickSignIn],
+        },
+      ],
+    },
+  ]);
+  assert.equal(bundle.meta.status, 'incomplete');
+  assert.deepEqual(
+    bundle.steps.map(({ action, failed }) => ({ action, failed })),
+    [{ action: 'Open http://127.0.0.1:4321/', failed: undefined }],
+  );
+});
+
+test('a retried test yields one set of QA Instructions from its last attempt', async () => {
+  const { dirs, bundle } = await runAttempts([
+    {
+      status: 'failed',
+      retry: 0,
+      steps: [{ ...navigate, error: { message: 'net::ERR' } }],
+    },
+    { status: 'passed', retry: 1, steps: [navigate, clickSignIn] },
+  ]);
+  assert.deepEqual(dirs, ['sign-in--sign-in-with-bad-credentials']);
+  assert.equal(bundle.meta.status, 'complete');
+  assert.equal(bundle.steps.length, 2);
+});
 
 test('reporter derives QA Steps from an unmodified test run', async () => {
   const bundle = await runReporter([
@@ -217,6 +351,7 @@ async function bundleDirsAfterRun(
         step({ category: 'pw:api', title: 'Navigate', params: { url: '/' } }),
       ],
     } as unknown as TestResult);
+    await reporter.onEnd();
     return await readdir(out);
   } finally {
     await rm(out, { recursive: true, force: true });
@@ -321,6 +456,7 @@ test('reporter never throws into the test run', async () => {
         step({ category: 'pw:api', title: 'Navigate', params: { url: '/' } }),
       ],
     } as unknown as TestResult);
+    await reporter.onEnd();
   } finally {
     console.warn = warn;
   }

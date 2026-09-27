@@ -1,7 +1,24 @@
 import type { QaRunBundle, QaStep } from '../model.js';
 
+/** Where an incomplete test stopped, for the note above its QA Steps. */
+function incompleteNote(bundle: QaRunBundle): string {
+  const failing = bundle.steps.find((step) => step.failed);
+  const last = bundle.steps.at(-1);
+  if (failing) {
+    return `**Incomplete:** the test failed at step ${failing.index}, so any later steps are missing.`;
+  }
+  if (last) {
+    return `**Incomplete:** the test failed after step ${last.index}, so any later steps are missing.`;
+  }
+  return '**Incomplete:** the test failed before its first step.';
+}
+
 export function renderQaSteps(bundle: QaRunBundle): string {
   const lines: string[] = [];
+
+  if (bundle.meta.status === 'incomplete') {
+    lines.push(incompleteNote(bundle), '');
+  }
 
   if (bundle.meta.prerequisite) {
     lines.push(bundle.meta.prerequisite, '');
@@ -16,7 +33,8 @@ export function renderQaSteps(bundle: QaRunBundle): string {
       section = title;
     }
     const expected = step.expected ? ` — ${step.expected}` : '';
-    lines.push(`${step.index}. ${step.action}${expected}`);
+    const failed = step.failed ? ' (**test failed here**)' : '';
+    lines.push(`${step.index}. ${step.action}${expected}${failed}`);
   }
 
   return lines.join('\n').trimEnd() + '\n';
