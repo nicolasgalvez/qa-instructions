@@ -43,6 +43,7 @@ export const GOLDENS = [
     'failing--sign-in-with-a-missing-link',
     'failing--setup-fails-before-any-step',
     'failing--flaky-sign-in-passes-on-retry',
+    'failing--sign-in-despite-failed-soft-checks',
   ].map((name) => ({
     rendered: `qa-steps-out/failing/${name}.txt`,
     golden: `golden/failing/${name}.txt`,

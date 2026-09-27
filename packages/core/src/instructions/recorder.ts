@@ -121,7 +121,8 @@ type PendingStep = {
  *
  * A test that does not pass yields incomplete QA Instructions: the QA Steps
  * stop at the first failed Action or check, and the step it belongs to is
- * marked as the failing step.
+ * marked as the failing step. A failed soft check does not stop them: its
+ * step is flagged and the QA Steps go on, as the test did.
  *
  * Given a screenshot source, each QA Step also gets the Step Screenshot of
  * its Action, and the element box and click point where known.
@@ -161,6 +162,11 @@ export class QaInstructionsRecorder implements TestEventSink {
   /** Which attempt of the test this recorder saw; 1 unless retried. */
   get attempt(): number {
     return this.start?.attempt ?? 1;
+  }
+
+  /** The test was skipped, so it has no QA Instructions to give. */
+  get skipped(): boolean {
+    return this.end?.status === 'skipped';
   }
 
   handle(event: TestEvent): void {
@@ -232,6 +238,7 @@ export class QaInstructionsRecorder implements TestEventSink {
         section: step.section,
         failed:
           step.failed ?? (checks.some(({ failed }) => failed) || undefined),
+        checkFailed: checks.some(({ softFailed }) => softFailed) || undefined,
         warning: step.warning,
         approximate: step.approximate,
         ...this.captureFields(capture, screenshot, asset),
@@ -312,9 +319,16 @@ export class QaInstructionsRecorder implements TestEventSink {
     });
   }
 
-  /** Nothing after the first failure is a QA Step: the tester stops there. */
+  /**
+   * Nothing after the first failure is a QA Step: the tester stops there.
+   * A failed soft check is no such failure: the test went on after it.
+   */
   private stopAt(event: ActionEvent | CheckEvent): void {
-    if (event.failed) this.stopped = true;
+    if (event.failed && !this.isSoft(event)) this.stopped = true;
+  }
+
+  private isSoft(event: ActionEvent | CheckEvent): boolean {
+    return event.type === 'check' && event.soft === true;
   }
 
   private onAction(event: ActionEvent): void {
@@ -403,7 +417,7 @@ export class QaInstructionsRecorder implements TestEventSink {
   private seenChecks(
     checks: CheckEvent[],
     source: ScreenshotSource,
-  ): { phrase: string; failed?: boolean }[] {
+  ): { phrase: string; failed: boolean; softFailed: boolean }[] {
     return checks.flatMap((event) => {
       const element =
         event.ref === undefined
@@ -412,7 +426,11 @@ export class QaInstructionsRecorder implements TestEventSink {
       const phrase = this.phraser.check(this.completed(event, source), {
         element,
       });
-      return phrase ? [{ phrase, failed: event.failed }] : [];
+      const failed = event.failed === true;
+      const soft = this.isSoft(event);
+      return phrase
+        ? [{ phrase, failed: failed && !soft, softFailed: failed && soft }]
+        : [];
     });
   }
 

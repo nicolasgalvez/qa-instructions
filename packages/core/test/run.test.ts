@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   QaInstructionsRun,
+  type TestEndEvent,
   type TestEvent,
   type TestStartEvent,
 } from '../src/index.js';
@@ -21,7 +22,7 @@ const signIn: TestStartEvent = {
 function attempt(
   startEvent: TestStartEvent,
   attemptNumber: number,
-  status: 'passed' | 'failed',
+  status: TestEndEvent['status'],
   ...events: TestEvent[]
 ): TestEvent[] {
   return [
@@ -117,6 +118,36 @@ test('tests that share a title get distinct directories', () => {
       'sign-in--sign-in--firefox',
       'sign-in--sign-in--chromium--line-20',
     ],
+  );
+});
+
+test('a skipped test yields no QA Instructions', () => {
+  const run = new QaInstructionsRun();
+  feed(
+    run,
+    // Skipped before it ran.
+    attempt({ ...signIn, id: 'skipped', title: 'Sign up' }, 1, 'skipped'),
+    // Skipped at runtime, after an Action.
+    attempt(
+      { ...signIn, id: 'skipped-at-runtime', title: 'Sign out' },
+      1,
+      'skipped',
+      { type: 'action', kind: 'navigate', url: '/' },
+    ),
+    // Skipped on its retry: the last attempt decides.
+    attempt({ ...signIn, id: 'retried' }, 1, 'failed', {
+      type: 'action',
+      kind: 'reload',
+      failed: true,
+    }),
+    attempt({ ...signIn, id: 'retried' }, 2, 'skipped'),
+    // The same title in another project: named as if alone.
+    attempt({ ...signIn, id: 'kept', project: 'firefox' }, 1, 'passed'),
+  );
+
+  assert.deepEqual(
+    run.results().map((result) => result.dirName),
+    ['sign-in--sign-in'],
   );
 });
 

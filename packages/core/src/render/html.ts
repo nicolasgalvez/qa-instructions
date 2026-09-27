@@ -69,9 +69,10 @@ export class HtmlRenderer {
   }
 
   private step(step: QaStepView): string[] {
-    const classes = [step.warning && 'warning', step.failed && 'failed'].filter(
-      Boolean,
-    );
+    const classes = [
+      step.warning && 'warning',
+      step.failure && 'failed',
+    ].filter(Boolean);
     const warning = step.warning
       ? `<strong>${QaWording.warning}:</strong> `
       : '';
@@ -87,9 +88,9 @@ export class HtmlRenderer {
         `<p><strong>${QaWording.expected}:</strong> ${InlineMarkup.toHtml(step.expected)}`,
       );
     }
-    if (step.failed) {
+    if (step.failure) {
       paragraphs[paragraphs.length - 1] +=
-        ` (<strong class="failed-here">${QaWording.failed}</strong>)`;
+        ` (<strong class="failed-here">${step.failure}</strong>)`;
     }
 
     const lines = [

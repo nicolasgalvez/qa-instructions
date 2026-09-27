@@ -1,0 +1,6 @@
+**Incomplete:** a check failed at step 2; the test went on, so the later steps are all here.
+
+1. Open http://127.0.0.1:4321/
+2. Click the **Sign in** link — The page title is **Log in** (**check failed here**)
+3. Type **demo-user** into **Username** — **Username** shows **someone-else** (**check failed here**)
+4. Click the **Submit good credentials** link — The page shows **Logged in as demo-user**

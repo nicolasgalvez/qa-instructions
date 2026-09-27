@@ -5,10 +5,11 @@ import path from 'node:path';
 import { root } from './goldens.mjs';
 
 // Runs the deliberately failing tests (with retries) and asserts the run
-// fails as expected, yielding one bundle per test despite the retries.
+// fails as expected, yielding one bundle per test that ran despite the
+// retries, and none for the skipped tests.
 
 const bundlesDir = path.join(root, 'qa-runs', 'failing');
-const expectedBundles = 4;
+const expectedBundles = 5;
 
 await rm(bundlesDir, { recursive: true, force: true });
 

@@ -19,6 +19,8 @@ export type CheckSite = {
   matcher: string;
   /** The check is written with `.not`. */
   negated: boolean;
+  /** The check is written with `expect.soft`, so the test goes on if it fails. */
+  soft: boolean;
   /** The checked subject as written, e.g. `page.getByLabel('Username')` or `page`. */
   subject: string;
   /** The matcher's first argument, when it is written as a plain literal. */
@@ -180,28 +182,30 @@ export class CallSiteReader {
     if (text[i - 1] !== ')') return undefined;
 
     const open = this.openerOf(text, i - 1);
-    if (!this.isExpectCallee(text, this.skipSpaceBack(text, open))) {
-      return undefined;
-    }
+    const callee = this.expectCallee(text, this.skipSpaceBack(text, open));
+    if (callee === undefined) return undefined;
     const subject = this.firstArgument(source, { start: open + 1, end: i - 1 });
     const matcherArgs = this.argumentsOf(text, offset);
     const expected =
       matcherArgs &&
       this.valueOf(source, this.firstArgument(source, matcherArgs));
-    const site = { matcher, negated, subject };
+    const site = { matcher, negated, soft: callee === 'soft', subject };
     return expected === undefined ? site : { ...site, expected };
   }
 
-  /** `expect`, `expect.soft`, or `expect.poll` ends just before `end`. */
-  private isExpectCallee(text: string, end: number): boolean {
+  /**
+   * The modifier of the `expect`, `expect.soft`, or `expect.poll` that ends
+   * just before `end` (empty for plain `expect`), or undefined if none does.
+   */
+  private expectCallee(text: string, end: number): string | undefined {
     const word = this.wordBefore(text, end);
-    if (word === 'expect') return true;
-    if (!EXPECT_MODIFIERS.has(word)) return false;
+    if (word === 'expect') return '';
+    if (!EXPECT_MODIFIERS.has(word)) return undefined;
     const dot = this.skipSpaceBack(text, end - word.length);
-    return (
+    const expect =
       text[dot - 1] === '.' &&
-      this.wordBefore(text, this.skipSpaceBack(text, dot - 1)) === 'expect'
-    );
+      this.wordBefore(text, this.skipSpaceBack(text, dot - 1)) === 'expect';
+    return expect ? word : undefined;
   }
 
   /** The first argument in `range`, as written in the original source. */

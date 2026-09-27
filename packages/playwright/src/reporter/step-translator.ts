@@ -50,12 +50,13 @@ const LOCATOR_MATCHERS = new Set([
 ]);
 
 /**
- * A check's title: `Expect "not toBeHidden"`. Playwright 1.53–1.54 write the
- * matcher alone (`not toBeHidden`); 1.57–1.62 add the locator after it
+ * A check's title: `Expect "not toBeHidden"`, or `Expect "soft toBeHidden"`
+ * for an `expect.soft` check. Playwright 1.53–1.54 write the matcher alone
+ * (`not toBeHidden`); 1.57–1.62 add the locator after it
  * (`Expect "toBeVisible" getByText('Saved')`).
  */
 const EXPECT_TITLE =
-  /^(?:Expect "(?<not>not )?(?<matcher>[A-Za-z]+)"(?: (?<locator>.+))?|(?<bareNot>not )?(?<bareMatcher>to[A-Z][A-Za-z]*))$/;
+  /^(?:Expect "(?<soft>soft )?(?<not>not )?(?<matcher>[A-Za-z]+)"(?: (?<locator>.+))?|(?<bareSoft>soft )?(?<bareNot>not )?(?<bareMatcher>to[A-Z][A-Za-z]*))$/;
 
 /**
  * Playwright adapter for the core's inbound port: translates one test's
@@ -199,6 +200,7 @@ export class PlaywrightStepTranslator {
     const target = this.locators.parse(
       this.locator(step) ?? titled?.locator ?? site?.subject,
     );
+    const soft = titled?.soft || site?.soft;
     return {
       type: 'check',
       matcher,
@@ -208,19 +210,26 @@ export class PlaywrightStepTranslator {
       expected: this.text(this.params(step).expected) ?? site?.expected,
       ...(titled ? {} : { description: step.title }),
       failed: this.failed(step),
+      ...(soft ? { soft } : {}),
       ref,
     };
   }
 
-  /** The matcher, negation, and locator a check's title names, if it names them. */
-  private titledCheck(
-    title: string,
-  ): { matcher: string; negated: boolean; locator?: string } | undefined {
+  /** The matcher, negation, softness, and locator a check's title names, if it names them. */
+  private titledCheck(title: string):
+    | {
+        matcher: string;
+        negated: boolean;
+        soft: boolean;
+        locator?: string;
+      }
+    | undefined {
     const groups = EXPECT_TITLE.exec(title)?.groups;
     if (!groups) return undefined;
     return {
       matcher: groups.matcher ?? groups.bareMatcher,
       negated: Boolean(groups.not ?? groups.bareNot),
+      soft: Boolean(groups.soft ?? groups.bareSoft),
       locator: groups.locator,
     };
   }
