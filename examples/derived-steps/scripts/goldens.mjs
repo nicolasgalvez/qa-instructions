@@ -97,6 +97,13 @@ export const GOLDENS = [
       'qa-steps-out/long-page--order-boots-from-the-bottom-of-the-page.txt',
     golden: 'golden/long-page--order-boots-from-the-bottom-of-the-page.txt',
   },
+  // A form below the fold on a smoothly scrolling page.
+  {
+    rendered:
+      'qa-steps-out/long-page--order-gift-cards-on-a-smoothly-scrolling-page.txt',
+    golden:
+      'golden/long-page--order-gift-cards-on-a-smoothly-scrolling-page.txt',
+  },
   // Elements found by CSS selector and test id, named as the page shows them.
   {
     rendered: 'qa-steps-out/certificates--add-three-recs-to-the-cart.txt',

@@ -32,6 +32,21 @@ async function colorAt(data, point, viewport) {
 
 let markedClicks = 0;
 
+/** The smoothly scrolling page's form, far below the fold. */
+const GIFT_CARDS = 'long-page--order-gift-cards-on-a-smoothly-scrolling-page';
+
+/**
+ * Whether a step may have no Step Screenshot rather than a misleading one:
+ * a fill when the recording painted no frame between it and the next Action
+ * (every earlier frame may show the field before it was typed into), and
+ * the check of an already checked option (Playwright never scrolls to it).
+ */
+function mayLackScreenshot(name, step) {
+  return (
+    step.action.startsWith('Type ') || (name === GIFT_CARDS && step.index === 2)
+  );
+}
+
 let failed = false;
 
 function fail(message) {
@@ -74,6 +89,7 @@ for (const name of GOLDENS) {
   );
   for (const step of bundle.steps) {
     const label = `${name} step ${step.index}`;
+    if (!step.assetIds?.length && mayLackScreenshot(name, step)) continue;
     if (step.assetIds?.length !== 1) {
       fail(`${label}: expected one Step Screenshot, got ${step.assetIds}`);
       continue;
@@ -159,8 +175,11 @@ if (bundleDirs.includes(LONG_PAGE)) {
     );
   const [, fill, click] = bundle.steps;
 
-  // The field is 140×39 CSS pixels; most of it shows the green.
-  const green = await countColor(await image(fill), CHANGED_FIELD);
+  // The field is 140×39 CSS pixels; most of it shows the green. The click
+  // waits for its scroll, so the recording always has a frame after the fill.
+  const green = fill.assetIds?.length
+    ? await countColor(await image(fill), CHANGED_FIELD)
+    : 0;
   if (green < 2000) {
     fail(
       `${LONG_PAGE} step 2: the typed value is not shown (${green} green pixels)`,
@@ -174,6 +193,33 @@ if (bundleDirs.includes(LONG_PAGE)) {
     if (!near(color, BUTTON)) {
       fail(
         `${LONG_PAGE} step 3: the click is marked on rgb(${color}), not on the button`,
+      );
+    }
+  }
+}
+
+// The smoothly scrolling page: the fill's focus starts a scroll that runs on
+// after the fill ends. Its screenshot, if any, must show the form (yellow)
+// with the typed field (green), not the top of the page.
+const FORM = [255, 212, 0];
+
+if (bundleDirs.includes(GIFT_CARDS)) {
+  const dir = path.join(root, 'qa-runs', GIFT_CARDS);
+  const bundle = JSON.parse(
+    await readFile(path.join(dir, 'bundle.json'), 'utf8'),
+  );
+  const fill = bundle.steps[2];
+  if (fill.assetIds?.length) {
+    const data = await readFile(
+      path.join(dir, 'assets', bundle.assets[fill.assetIds[0]].filename),
+    );
+    const form = await countColor(data, FORM);
+    const green = await countColor(data, CHANGED_FIELD);
+    // At least a strip of the 140×39 field, at the bottom edge if the scroll
+    // brought it just into view.
+    if (form < 20000 || green < 500) {
+      fail(
+        `${GIFT_CARDS} step 3: the typed field is not shown (${form} form, ${green} green pixels)`,
       );
     }
   }

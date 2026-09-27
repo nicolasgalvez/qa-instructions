@@ -497,6 +497,69 @@ test('trace format 8: a click is never marked on a frame painted before the page
   assert.deepEqual(moments(source.capture(V8_SCROLL.ADD)), ['after']);
 });
 
+/**
+ * Trace format 8 of a smoothly scrolling long page
+ * (fixtures/traces/smooth.spec.ts, Playwright 1.56), as on a store's product
+ * page: a check of an already checked radio, a fill whose focus starts a
+ * smooth scroll that outlasts it, and at once a click on the same form, which
+ * waits for the scroll to settle. Viewport 400×300.
+ */
+const V8_SMOOTH = {
+  CHECK: ActionRef.of(5, `Check getByLabel('One time')`),
+  FILL: ActionRef.of(6, `Fill "3" getByLabel('Quantity')`),
+};
+
+test('trace format 8: a fill whose smooth scroll outlasts it gets the frame showing the scroll settled', async () => {
+  const source = await TraceScreenshotSource.open(fixture('v8-smooth.zip'));
+  const fill = source.capture(V8_SMOOTH.FILL);
+  assert.deepEqual(moments(fill), ['after']);
+  // Frames painted soon after the fill still show the page scrolling from
+  // the top (all green); the last one before the click scrolls shows the
+  // band, with the typed field at the bottom edge.
+  const frame = shot(fill, 'after');
+  assertColor(
+    await jpegPixel(frame, 300, 250),
+    SCROLL_PAGE.yellowBand,
+    'scrolled to the band',
+  );
+  assertColor(
+    await jpegPixel(frame, 200, 296),
+    SCROLL_PAGE.typedField,
+    'the typed field',
+  );
+});
+
+test('trace format 8: a fill with no frame painted after it gets no screenshot, never one from before its scroll', async () => {
+  // The click's scroll moved to 1ms after the fill ended: no frame was
+  // painted between, and the last one by the fill's end shows the page top.
+  const entries = unzipSync(await readFile(fixture('v8-smooth.zip')));
+  const library = strFromU8(entries['0-trace.trace']);
+  const fillEnd =
+    /"type":"after","callId":"call@12"[^\n]*?"endTime":([\d.]+)/.exec(
+      library,
+    )?.[1];
+  const clickScroll =
+    /"callId":"call@14","time":([\d.]+),"message":" *scrolling into view/.exec(
+      library,
+    )?.[1];
+  assert.ok(fillEnd && clickScroll);
+  entries['0-trace.trace'] = strToU8(
+    library.replace(
+      `"time":${clickScroll}`,
+      `"time":${(Number(fillEnd) + 1).toFixed(3)}`,
+    ),
+  );
+  const source = await openEntries(entries);
+  assert.deepEqual(moments(source.capture(V8_SMOOTH.FILL)), []);
+});
+
+test('trace format 8: a check Playwright skipped (already checked) gets no screenshot', async () => {
+  // Playwright neither scrolled to the radio nor clicked it, so no frame is
+  // known to show it: the only one by its end shows the top of the page.
+  const source = await TraceScreenshotSource.open(fixture('v8-smooth.zip'));
+  assert.deepEqual(moments(source.capture(V8_SMOOTH.CHECK)), []);
+});
+
 test('a later trace without per-action screenshots falls back to the screen recording', async () => {
   // The v9 sample with its per-action screenshots replaced by one recorded
   // frame, as `trace: 'on'` without `snapshots.screen` writes it.

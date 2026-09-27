@@ -1,0 +1,71 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Gift cards">
+  <h1>Gift cards</h1>
+  <p>A page that scrolls smoothly, with its order form far below the fold, as on a store's product page.</p>
+
+  <div class="spacer" aria-hidden="true"></div>
+
+  <form class="product" id="gift-card">
+    <h2>Gift card</h2>
+    <label class="plan"><input type="radio" name="plan" value="once" checked /> One time purchase</label>
+    <label class="plan"><input type="radio" name="plan" value="monthly" /> Monthly</label>
+    <label>
+      Gift card quantity
+      <input name="gift-card" type="number" value="1" />
+    </label>
+    <button type="button" class="add" id="add-gift-cards" aria-label="Add gift cards to cart">
+      Add to cart
+    </button>
+    <p id="added" hidden>Added <span id="added-quantity"></span> gift cards to the cart</p>
+  </form>
+
+  <div class="spacer" aria-hidden="true"></div>
+
+  <style>
+    :global(html) {
+      scroll-behavior: smooth;
+    }
+    .spacer {
+      height: 1600px;
+    }
+    .product {
+      padding: 16px;
+      background: #ffd400;
+    }
+    .plan {
+      display: block;
+    }
+    .product input[type='number'] {
+      display: block;
+      width: 120px;
+      margin-top: 8px;
+      padding: 8px;
+      border: 2px solid #111;
+      font: inherit;
+    }
+    /* A changed quantity turns green, so a screenshot shows the typed value. */
+    .product input.changed {
+      background: #19a974;
+    }
+    .add {
+      margin-top: 16px;
+      width: 240px;
+      padding: 16px;
+      border: none;
+      background: #1f4fd8;
+      color: #fff;
+      font: inherit;
+      cursor: pointer;
+    }
+  </style>
+  <script is:inline>
+    const quantity = document.querySelector('input[name="gift-card"]');
+    quantity.addEventListener('input', () => quantity.classList.add('changed'));
+    document.getElementById('add-gift-cards').addEventListener('click', () => {
+      document.getElementById('added-quantity').textContent = quantity.value;
+      document.getElementById('added').hidden = false;
+    });
+  </script>
+</Base>

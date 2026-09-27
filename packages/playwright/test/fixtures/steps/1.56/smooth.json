@@ -1,0 +1,106 @@
+{
+  "title": "smooth",
+  "steps": [
+    {
+      "title": "Before Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"browser\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Launch browser",
+              "category": "pw:api"
+            }
+          ]
+        },
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create context",
+              "category": "pw:api"
+            }
+          ]
+        },
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Create page",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Navigate to \"data:\"",
+      "category": "pw:api",
+      "location": {
+        "file": "smooth.spec.ts",
+        "line": 30,
+        "column": 14
+      }
+    },
+    {
+      "title": "Check getByLabel('One time')",
+      "category": "pw:api",
+      "location": {
+        "file": "smooth.spec.ts",
+        "line": 32,
+        "column": 37
+      }
+    },
+    {
+      "title": "Fill \"3\" getByLabel('Quantity')",
+      "category": "pw:api",
+      "location": {
+        "file": "smooth.spec.ts",
+        "line": 34,
+        "column": 37
+      }
+    },
+    {
+      "title": "Click getByRole('button', { name: 'Add' })",
+      "category": "pw:api",
+      "location": {
+        "file": "smooth.spec.ts",
+        "line": 36,
+        "column": 51
+      }
+    },
+    {
+      "title": "Wait for timeout",
+      "category": "pw:api",
+      "location": {
+        "file": "smooth.spec.ts",
+        "line": 37,
+        "column": 14
+      }
+    },
+    {
+      "title": "After Hooks",
+      "category": "hook",
+      "steps": [
+        {
+          "title": "Fixture \"page\"",
+          "category": "fixture"
+        },
+        {
+          "title": "Fixture \"context\"",
+          "category": "fixture",
+          "steps": [
+            {
+              "title": "Close context",
+              "category": "pw:api"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

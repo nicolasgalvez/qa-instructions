@@ -35,6 +35,8 @@ export type RecordedCall = {
    * `Infinity` if none did.
    */
   nextChange: number;
+  /** Whether the page's DOM snapshots show the call changed it; unknown without them. */
+  changedPage?: boolean;
 };
 
 /**
@@ -79,23 +81,26 @@ export class RecordingFrames {
   }
 
   /**
-   * The frame showing the page once the call was done, painted after it
-   * ended and before the next call began to change the page: the first one
-   * painted PAINT_LAG or more after its end, which is sure to show its
-   * result, else the last one painted after its end. Without either, the
-   * last one painted by its end, or the page's first frame.
+   * The frame showing the page once the call was done: the last one painted
+   * after it ended and before the next call began to change the page. The
+   * call's effect can outlast it (a smooth scroll to a focused field runs
+   * on after a fill ends, while the DOM snapshots still record the old
+   * scroll offsets), and the recording gets a frame only when the page
+   * repaints, so the last frame shows the page as it settled, where an
+   * earlier one may show it still moving. Without such a frame, the last
+   * one painted by its end, or the page's first frame; except that an
+   * Action that sent input to an element with no point to mark (a fill) and
+   * changed the page gets none, as a frame from before its end may show the
+   * page before it scrolled to the field and typed.
    */
   afterAction(call: RecordedCall): ScreencastFrame | undefined {
     const { pageId, nextChange } = call;
     const end = call.endTime ?? call.startTime;
     if (end === undefined) return undefined;
+    const after = this.screencast.lastPaintedBetween(pageId, end, nextChange);
+    const typed = call.inputSnapshot !== undefined && !call.marks;
+    if (after || (typed && call.changedPage)) return after;
     return (
-      this.screencast.firstPaintedBetween(
-        pageId,
-        end + PAINT_LAG,
-        nextChange,
-      ) ??
-      this.screencast.lastPaintedBetween(pageId, end, nextChange) ??
       this.screencast.lastPaintedBy(pageId, end) ??
       this.screencast.first(pageId)
     );
