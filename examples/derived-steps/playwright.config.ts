@@ -21,19 +21,22 @@ export default defineConfig({
   reporter: [
     ['list'],
     // Default presentation of test.step groups: Sections.
-    ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs', mask }],
     [
-      '@qa-instructions/playwright/reporter',
+      '@procyon-creative/qa-instructions/playwright',
+      { outputDir: 'qa-runs', mask },
+    ],
+    [
+      '@procyon-creative/qa-instructions/playwright',
       { outputDir: 'qa-runs/collapse', testSteps: 'collapse', mask },
     ],
     [
-      '@qa-instructions/playwright/reporter',
+      '@procyon-creative/qa-instructions/playwright',
       { outputDir: 'qa-runs/ignore', testSteps: 'ignore', mask },
     ],
     ...highlightStyles.map(
       (highlight) =>
         [
-          '@qa-instructions/playwright/reporter',
+          '@procyon-creative/qa-instructions/playwright',
           {
             outputDir: `qa-runs/styles/${highlight}`,
             highlight,

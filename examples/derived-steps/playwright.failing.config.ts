@@ -13,6 +13,9 @@ export default defineConfig({
   use: { ...base.use, actionTimeout: 1_000 },
   reporter: [
     ['list'],
-    ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs/failing' }],
+    [
+      '@procyon-creative/qa-instructions/playwright',
+      { outputDir: 'qa-runs/failing' },
+    ],
   ],
 });

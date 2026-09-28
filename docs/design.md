@@ -2,9 +2,9 @@
 
 ## Goal
 
-Turn what an existing Playwright test already does into QA Instructions a person can follow by hand, without changing the test. The developer adds one reporter to their Playwright config; every test run then produces QA Instructions per test. Rendering to ticket text happens in a separate step.
+Turn what an existing Playwright test already does into QA Instructions a person can follow by hand, without changing the test. The developer installs one package and adds one reporter to their Playwright config; every test run then produces QA Instructions per test, rendered to the chosen formats. A separate command re-renders saved bundles.
 
-The decision and its alternatives are recorded in [ADR 0001](./adr/0001-reporter-derived-qa-steps.md). Vocabulary (QA Instructions, QA Step, Action, Expected Result, Section, Step Screenshot, Highlight) is defined in [CONTEXT.md](../CONTEXT.md).
+The decisions and their alternatives are recorded in [ADR 0001](./adr/0001-reporter-derived-qa-steps.md) and [ADR 0002](./adr/0002-one-package-with-entry-points.md) (one package with entry points). Vocabulary (QA Instructions, QA Step, Action, Expected Result, Section, Step Screenshot, Highlight) is defined in [CONTEXT.md](../CONTEXT.md).
 
 ## Setup
 
@@ -14,21 +14,23 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   reporter: [
     ['list'],
-    ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs' }],
+    [
+      '@procyon-creative/qa-instructions/playwright',
+      { outputDir: 'qa-runs', formats: ['qa-steps', 'html'] },
+    ],
   ],
 });
 ```
 
-Tests are not changed. `@playwright/test` is a peer dependency used for types only; the package never loads Playwright at runtime, so it always runs against the project's own Playwright. Step Screenshots will come from Playwright's trace and add one `trace` setting to this config (see ADR 0001).
+Tests are not changed. `@playwright/test` is an optional peer dependency used for types only; the package never loads Playwright at runtime, so it always runs against the project's own Playwright. Step Screenshots come from Playwright's trace and add one `trace` setting to this config (see ADR 0001).
 
 Post-test CI step:
 
 ```yaml
-- run: npx qa-instructions render qa-runs/ --format qa-steps --out qa-steps-out/
 - uses: actions/upload-artifact@v4
   with:
-    name: qa-steps
-    path: qa-steps-out/
+    name: qa-instructions
+    path: qa-runs/
 ```
 
 ## Pipeline
@@ -46,30 +48,34 @@ Nothing in the core knows about Playwright or Jest. Nothing in rendering knows a
 
 ## Layer responsibilities
 
-### `@qa-instructions/core`
+One package, `@procyon-creative/qa-instructions`, with a source folder and an entry point per layer (ADR 0002).
 
-| Module          | Responsibility                                                                                     |
-| --------------- | -------------------------------------------------------------------------------------------------- |
-| `events`        | Inbound port: runner-neutral test events (test start/end, action, check)                           |
-| `instructions/` | `QaInstructionsRecorder` turns one test's events into QA Instructions; `StepPhraser` words them    |
-| `model`         | Bundle types: `QaRunBundle`, `QaStep`, `QaAsset`                                                   |
-| `bundle/`       | In-memory bundle builder; `writeBundle(dir, bundle, assets)`, `readBundle(dir)`, `bundleDirName()` |
-| `render/`       | Pure transforms: `renderQaSteps(bundle)`, `renderJson(bundle)`                                     |
+### Core: `src/core/`, entry point `@procyon-creative/qa-instructions`
+
+| Module          | Responsibility                                                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `events`        | Inbound port: runner-neutral test events (test start/end, action, check)                                                                                      |
+| `instructions/` | `QaInstructionsRecorder` turns one test's events into QA Instructions; `StepPhraser` words them                                                               |
+| `model`         | Bundle types: `QaRunBundle`, `QaStep`, `QaAsset`                                                                                                              |
+| `bundle/`       | In-memory bundle builder; `writeBundle(dir, bundle, assets)`, `readBundle(dir)`, `bundleDirName()`; `BundleRenderer` renders a bundle directory to one format |
+| `render/`       | Pure transforms: `render(bundle, format)` for `qa-steps`, `markdown`, `html`, `json`                                                                          |
 
 The recorder makes one QA Step per user Action (opening a URL, clicking, typing, pressing a key, choosing an option). Test plumbing a tester cannot repeat (waits, scripts, value reads, API requests, setup) is dropped. The checks that follow an Action become that QA Step's Expected Result; an Action with no following check has none.
 
-### `@qa-instructions/playwright`
+`src/core/` imports nothing from Playwright, Jest, sharp, `src/playwright/`, or `src/cli/` (ESLint).
 
-One entry point, `@qa-instructions/playwright/reporter`, whose default export is `QaInstructionsReporter`, a Playwright `Reporter`:
+### Playwright adapter: `src/playwright/`, entry point `@procyon-creative/qa-instructions/playwright`
+
+The default export is `QaInstructionsReporter`, a Playwright `Reporter`:
 
 - On `onTestEnd`, `PlaywrightStepTranslator` walks the test's `pw:api` and `expect` steps and emits core test events.
 - The core recorder builds the bundle, which is written to `<outputDir>/<file>--<test title>/`.
+- It then renders each of its `formats` beside `bundle.json` (`qa-steps.txt`, `qa-steps.md`, `qa-steps.html`, `qa-steps.json`) with the core's `BundleRenderer`.
 - It never throws into the test run; a failure to write is logged as a warning.
-- It does not render.
 
-### `@qa-instructions/cli`
+### CLI: `src/cli/`, the `qa-instructions` command
 
-Separate render step, invokable in CI after tests:
+Re-renders saved bundles, one format into a separate directory, without re-running tests:
 
 ```bash
 # Render all bundles collected during the run
@@ -79,7 +85,7 @@ qa-instructions render qa-runs/ --format qa-steps --out qa-steps-out/
 Also usable programmatically:
 
 ```typescript
-import { readBundle, renderQaSteps } from '@qa-instructions/core';
+import { readBundle, renderQaSteps } from '@procyon-creative/qa-instructions';
 
 const bundle = await readBundle('qa-runs/login--sign-in');
 const text = renderQaSteps(bundle);
@@ -131,6 +137,7 @@ qa-runs/
   sign-in--sign-in-with-bad-credentials/
     bundle.json
     assets/
+    qa-steps.txt        # one file per reporter format
 ```
 
 Renderers read `bundle.json` and resolve assets from `assets/`. No runner-specific fields in the step model.
@@ -156,9 +163,10 @@ See [research/2026-09-26-auto-derived-qa-steps-prior-art.md](./research/2026-09-
 
 ```
 packages/
-  core/                 # event port, recorder, bundle model + I/O, renderers
-  playwright/           # reporter adapter
-  cli/                  # qa-instructions render command
+  qa-instructions/      # the one published package
+    src/core/           # event port, recorder, bundle model + I/O, renderers
+    src/playwright/     # reporter adapter
+    src/cli/            # qa-instructions render command
 examples/
   verification/         # golden e2e against the fixture site
   derived-steps/        # golden e2e: helpers, plumbing, role/label locators

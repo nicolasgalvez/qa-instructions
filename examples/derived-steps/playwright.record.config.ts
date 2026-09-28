@@ -11,8 +11,11 @@ export default defineConfig({
   reporter: [
     ['list'],
     [
-      '../../packages/playwright/test/fixtures/steps/step-dump-reporter.mjs',
-      { outputDir: '../../packages/playwright/test/fixtures/steps/1.63' },
+      '../../packages/qa-instructions/test/playwright/fixtures/steps/step-dump-reporter.mjs',
+      {
+        outputDir:
+          '../../packages/qa-instructions/test/playwright/fixtures/steps/1.63',
+      },
     ],
   ],
 });

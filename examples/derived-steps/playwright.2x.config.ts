@@ -8,7 +8,10 @@ export default defineConfig(base, {
   testMatch: 'moving-ui.spec.ts',
   reporter: [
     ['list'],
-    ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs/2x' }],
+    [
+      '@procyon-creative/qa-instructions/playwright',
+      { outputDir: 'qa-runs/2x' },
+    ],
   ],
   use: { deviceScaleFactor: 2 },
 });

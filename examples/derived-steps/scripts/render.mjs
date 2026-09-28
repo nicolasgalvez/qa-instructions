@@ -7,7 +7,16 @@ import { root } from './goldens.mjs';
 // goldens cover. Arguments are `<bundle-dir>:<out-dir>` pairs.
 
 const FORMATS = ['qa-steps', 'markdown', 'html'];
-const cli = path.join(root, '..', '..', 'packages', 'cli', 'dist', 'index.js');
+const cli = path.join(
+  root,
+  '..',
+  '..',
+  'packages',
+  'qa-instructions',
+  'dist',
+  'cli',
+  'index.js',
+);
 
 for (const pair of process.argv.slice(2)) {
   const [input, out] = pair.split(':');

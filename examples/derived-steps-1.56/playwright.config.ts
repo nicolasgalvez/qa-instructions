@@ -13,7 +13,10 @@ export default defineConfig({
   testDir: './tests',
   reporter: [
     ['list'],
-    ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs', mask }],
+    [
+      '@procyon-creative/qa-instructions/playwright',
+      { outputDir: 'qa-runs', mask },
+    ],
   ],
   use: {
     baseURL,

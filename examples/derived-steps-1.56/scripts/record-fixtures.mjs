@@ -5,7 +5,7 @@ import path from 'node:path';
 import { SPECS, derivedSteps, root, syncSpecs } from './shared.mjs';
 
 // Re-records the adapter's Playwright-version fixtures in
-// packages/playwright/test/fixtures:
+// packages/qa-instructions/test/playwright/fixtures:
 //   steps/1.56/*.json, steps/1.63/*.json  reporter steps per test
 //   steps/*.spec.ts                       the sources those steps point at
 //   traces/v8.zip                         the sample scenario's 1.56 trace
@@ -20,8 +20,9 @@ const fixtures = path.join(
   '..',
   '..',
   'packages',
-  'playwright',
+  'qa-instructions',
   'test',
+  'playwright',
   'fixtures',
 );
 /** The adapter's own trace scenarios, recorded by the `trace` project. */

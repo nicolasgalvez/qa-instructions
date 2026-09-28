@@ -16,9 +16,12 @@ export const goldenDir = path.join(root, 'golden');
 
 export const bundleDirName = 'capture--login-error-flow';
 
-/** Rendered QA Steps text and the golden file it must equal. */
+/**
+ * The QA Steps text the reporter wrote beside the bundle (no render command
+ * runs), and the golden file it must equal.
+ */
 export const QA_STEPS = {
-  rendered: path.join(root, 'qa-steps-out', `${bundleDirName}.txt`),
+  rendered: path.join(root, 'qa-runs', bundleDirName, 'qa-steps.txt'),
   golden: path.join(goldenDir, 'qa-steps.txt'),
 };
 

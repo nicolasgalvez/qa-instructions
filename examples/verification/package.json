@@ -4,15 +4,13 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
-    "render": "node ../../packages/cli/dist/index.js render qa-runs --format qa-steps --out qa-steps-out",
     "verify": "node scripts/verify-run.mjs",
     "verify:update-goldens": "node scripts/update-goldens.mjs",
-    "e2e": "pnpm test && pnpm render && pnpm verify"
+    "e2e": "pnpm test && pnpm verify"
   },
   "devDependencies": {
-    "@qa-instructions/cli": "workspace:*",
+    "@procyon-creative/qa-instructions": "workspace:*",
     "@qa-instructions/fixture-site": "workspace:*",
-    "@qa-instructions/playwright": "workspace:*",
     "@playwright/test": "^1.63.0"
   }
 }
