@@ -10,9 +10,6 @@ on:
   # No paths-ignore on PRs: "e2e goldens" is a required check, so it must
   # report on docs-only PRs too or they can never merge.
   pull_request:
-  # Release PRs are pushed with the workflow token, which starts no
-  # pull_request runs; release-please.yml dispatches this on their branch.
-  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

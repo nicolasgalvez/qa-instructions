@@ -8,35 +8,44 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: write # dispatch the required checks on the release PR
+  id-token: write # npm trusted publishing (OIDC)
 
 jobs:
   release-please:
+    if: github.repository_owner == 'procyon-creative'
     runs-on: ubuntu-latest
     steps:
+      # Manifest mode: release-please-config.json and .release-please-manifest.json
+      # version packages/qa-instructions, so its outputs are prefixed with that path.
       - uses: googleapis/release-please-action@v5
         id: release
-        with:
-          release-type: node
 
-      # release-please pushes its PR with the workflow token, and GitHub starts
-      # no pull_request workflows for that token, so the required checks would
-      # never run. workflow_dispatch is exempt; the dispatched runs report on
-      # the release branch's head commit, which is the PR's.
-      - name: Run required checks on the release PR
-        if: ${{ steps.release.outputs.pr }}
-        # Parse the PR in the script: `env` is evaluated even when `if` is
-        # false, and fromJSON('') fails on runs with no release PR.
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_PR: ${{ steps.release.outputs.pr }}
-        run: |
-          BRANCH=$(jq -r .headBranchName <<<"$RELEASE_PR")
-          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
-          gh workflow run e2e.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
+      # Publish to npm via trusted publishing (OIDC) when a release is created.
+      - uses: actions/checkout@v7
+        if: ${{ steps.release.outputs['packages/qa-instructions--release_created'] }}
+
+      - uses: pnpm/action-setup@v6
+        if: ${{ steps.release.outputs['packages/qa-instructions--release_created'] }}
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v7
+        if: ${{ steps.release.outputs['packages/qa-instructions--release_created'] }}
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+        if: ${{ steps.release.outputs['packages/qa-instructions--release_created'] }}
+
+      - run: pnpm --filter @procyon-creative/qa-instructions build
+        if: ${{ steps.release.outputs['packages/qa-instructions--release_created'] }}
+
+      - run: pnpm --filter @procyon-creative/qa-instructions publish --access public --no-git-checks
+        if: ${{ steps.release.outputs['packages/qa-instructions--release_created'] }}
 
       - uses: procyon-creative/jira-action-man@v2
-        if: ${{ steps.release.outputs.release_created }}
+        if: ${{ steps.release.outputs['packages/qa-instructions--release_created'] }}
         id: jira
         with:
           projects: 'QI'

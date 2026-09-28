@@ -21,7 +21,22 @@ The `protect` ruleset on `main` requires two status checks. A PR cannot merge un
 
 Neither workflow uses `paths-ignore` on `pull_request`. A required check that never reports leaves the PR blocked, so docs-only PRs must run both. Renaming a job's `name:` breaks its required check; update the ruleset in the same change.
 
-Release PRs are the exception to `pull_request` runs: release-please pushes them with the workflow token, which starts no workflows. `release-please.yml` therefore dispatches `ci.yml` and `e2e.yml` (`workflow_dispatch`) on the release branch after each release-please run, and their results report on the PR's head commit.
+## Releases
+
+`release-please.yml` runs on every push to `main` (upstream only; forks skip it). release-please runs in manifest mode (`release-please-config.json`, `.release-please-manifest.json`) and versions only `packages/qa-instructions`: `feat:`/`fix:` merges open or refresh a release PR that bumps the package's `package.json` and writes `packages/qa-instructions/CHANGELOG.md`. Merging the release PR tags `vX.Y.Z`, creates the GitHub release, publishes `@procyon-creative/qa-instructions` to npm with OIDC trusted publishing (no npm token), and posts the release to Jira.
+
+### One-time npm setup (maintainer)
+
+Trusted publishing needs the package to exist on npm first. Do this before merging the next release PR:
+
+```bash
+npm login
+pnpm install && pnpm build
+cd packages/qa-instructions && npm publish --access public
+npm trust github @procyon-creative/qa-instructions --file release-please.yml --repo procyon-creative/qa-instructions
+```
+
+`npm trust` prompts for 2FA. After that, every merged release PR publishes on its own.
 
 ## Self-hosted on `ruby`
 
