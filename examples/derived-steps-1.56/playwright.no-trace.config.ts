@@ -9,7 +9,10 @@ export default defineConfig({
   ...base,
   outputDir: 'test-results/no-trace',
   reporter: [
-    ['@qa-instructions/playwright/reporter', { outputDir: 'qa-runs-no-trace' }],
+    [
+      '@procyon-creative/qa-instructions/playwright',
+      { outputDir: 'qa-runs-no-trace' },
+    ],
   ],
   use: { ...base.use, trace: 'off' },
 });

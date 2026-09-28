@@ -4,11 +4,10 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
-    "render": "node ../../packages/cli/dist/index.js render qa-runs --format qa-steps --out qa-steps-out"
+    "render": "node ../../packages/qa-instructions/dist/cli/index.js render qa-runs --format qa-steps --out qa-steps-out"
   },
   "devDependencies": {
-    "@qa-instructions/cli": "workspace:*",
-    "@qa-instructions/playwright": "workspace:*",
+    "@procyon-creative/qa-instructions": "workspace:*",
     "@playwright/test": "^1.63.0"
   }
 }

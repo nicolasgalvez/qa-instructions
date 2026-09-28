@@ -7,9 +7,13 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
   {
-    // The core is runner-independent (ADR 0001): no test runner, even for
-    // types, and no drawing library (Highlights are drawn behind a port).
-    files: ['packages/core/**/*.ts'],
+    // The core is runner-independent (ADR 0001, ADR 0002): no test runner,
+    // even for types, no drawing library (Highlights are drawn behind a
+    // port), and nothing from the runner adapters or the CLI beside it.
+    files: [
+      'packages/qa-instructions/src/core/**/*.ts',
+      'packages/qa-instructions/test/core/**/*.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -20,6 +24,12 @@ export default tseslint.config(
             'playwright/*',
             '@jest/*',
             'sharp',
+            '**/src/playwright/**',
+            '**/src/cli/**',
+            '../playwright/**',
+            '../cli/**',
+            '../../playwright/**',
+            '../../cli/**',
           ],
         },
       ],
@@ -27,7 +37,7 @@ export default tseslint.config(
   },
   {
     // The reporter must never load Playwright at runtime; types only.
-    files: ['packages/playwright/src/reporter/**/*.ts'],
+    files: ['packages/qa-instructions/src/playwright/**/*.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',

@@ -2,7 +2,7 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
-This is a **single-context** repo: `packages/cli`, `packages/core`, and `packages/playwright` are one product sharing one vocabulary.
+This is a **single-context** repo: one package, `packages/qa-instructions` (its `src/core`, `src/playwright`, and `src/cli` folders), sharing one vocabulary.
 
 ## Before exploring, read these
 

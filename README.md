@@ -4,13 +4,13 @@ Turns what your existing Playwright tests already do into QA Instructions: steps
 
 ## Setup
 
-The packages are not on npm yet. Build a checkout, then install its reporter and CLI into your project:
+One package, `@procyon-creative/qa-instructions`, holds the Playwright reporter and the `qa-instructions` command. It is not on npm yet. Build a checkout, then install it into your project:
 
 ```bash
 git clone https://github.com/procyon-creative/qa-instructions
 cd qa-instructions && pnpm install && pnpm build
 cd ../your-project
-npm install -D file:../qa-instructions/packages/playwright file:../qa-instructions/packages/cli
+npm install -D file:../qa-instructions/packages/qa-instructions
 ```
 
 Add the reporter, and the trace setting for Step Screenshots, to `playwright.config.ts`:
@@ -22,9 +22,10 @@ export default defineConfig({
   reporter: [
     ['list'],
     [
-      '@qa-instructions/playwright/reporter',
+      '@procyon-creative/qa-instructions/playwright',
       {
         outputDir: 'qa-runs',
+        formats: ['qa-steps', 'markdown'],
         testSteps: 'sections',
         highlight: ['outline', 'clickDot'],
         // Only tests tagged @qa produce QA Instructions:
@@ -44,15 +45,11 @@ export default defineConfig({
 });
 ```
 
-Every option is optional; `['@qa-instructions/playwright/reporter']` alone works. See [Reporter options](#reporter-options).
+Every option is optional; `['@procyon-creative/qa-instructions/playwright']` alone works. See [Reporter options](#reporter-options).
 
-Run your tests as usual (`npx playwright test`); the reporter writes one QA Instructions bundle per test to `qa-runs/<file>--<test title>/`. Then [render](#render) them:
+Run your tests as usual (`npx playwright test`); the reporter writes one QA Instructions bundle per test to `qa-runs/<file>--<test title>/`, with the rendered QA Instructions beside it (`qa-steps.txt`, Jira-ready text, by default; see [`formats`](#formats)). Paste `qa-steps.txt` into your ticket's QA Steps. To re-render saved bundles without re-running tests, use [`qa-instructions render`](#render).
 
-```bash
-npx qa-instructions render qa-runs --format qa-steps --out qa-steps-out
-```
-
-`@playwright/test` is a peer dependency used for types only, so the package always runs against your project's own Playwright and never loads a second copy.
+`@playwright/test` is an optional peer dependency used for types only, so the package always runs against your project's own Playwright and never loads a second copy.
 
 With the trace setting on, each QA Step gets a Step Screenshot of the page at the moment of its Action, saved in the bundle's `assets/` and listed in the step's `assetIds`. The element acted on (`elementBox`), for clicks the click point (`clickPoint`), and the page's `viewport` are recorded on the step in CSS pixels. Without the setting, QA Steps are text only.
 
@@ -67,6 +64,7 @@ The second element of the reporter entry in `playwright.config.ts`.
 | Option      | Type                                                                              | Default                     |
 | ----------- | --------------------------------------------------------------------------------- | --------------------------- |
 | `outputDir` | `string`                                                                          | `'qa-runs'`                 |
+| `formats`   | `('qa-steps' \| 'markdown' \| 'html' \| 'json')[]`                                | `['qa-steps']`              |
 | `select`    | `{ tags?: string[]; files?: string[] }`                                           | every test                  |
 | `testSteps` | `'sections' \| 'collapse' \| 'ignore'`                                            | `'sections'`                |
 | `highlight` | `'outline' \| 'clickDot' \| 'badge' \| 'spotlight'`, a list of these, or `'none'` | `['outline', 'clickDot']`   |
@@ -88,6 +86,25 @@ An unrecognized command-line argument also counts as a partial run. A bundle who
 ```typescript
 {
   outputDir: 'artifacts/qa-runs';
+}
+```
+
+### `formats`
+
+The rendered QA Instructions the reporter writes into each bundle directory, beside `bundle.json`, once the run ends. The default is `['qa-steps']`; `[]` writes the bundle only.
+
+| Format     | File            | Step Screenshots                                            |
+| ---------- | --------------- | ----------------------------------------------------------- |
+| `qa-steps` | `qa-steps.txt`  | None                                                        |
+| `markdown` | `qa-steps.md`   | Inline, linked to the bundle's own `assets/`                |
+| `html`     | `qa-steps.html` | Embedded as data URIs; the one file works on its own        |
+| `json`     | `qa-steps.json` | Not included (the bundle itself, as `render --format json`) |
+
+The output matches [`qa-instructions render`](#render) exactly; only where the files go differs. An unknown format is ignored, with one warning.
+
+```typescript
+{
+  formats: ['qa-steps', 'markdown', 'html'];
 }
 ```
 
@@ -202,10 +219,10 @@ When the test found the element inside another one (`form.locator(…)` on `page
 
 ## Render
 
-Rendering is a separate step, so you can re-render without re-running tests:
+The reporter renders as it writes (see [`formats`](#formats)). The `qa-instructions` command, from the same package, re-renders saved bundles without re-running tests, to one format into a separate directory:
 
 ```bash
-qa-instructions render <bundle-dir> --format <format> --out <dir>
+npx qa-instructions render <bundle-dir> --format <format> --out <dir>
 ```
 
 `<bundle-dir>` is the reporter's `outputDir` (every bundle directly inside it is rendered) or one bundle's directory. `--format` defaults to `qa-steps` and `--out` to `qa-steps-out`. For example, `qa-instructions render qa-runs --format qa-steps --out qa-steps-out`, then paste `qa-steps-out/*.txt` into your ticket's QA Steps.
@@ -229,17 +246,21 @@ Playwright reporter (adapter)  →  core (test events → QA Instructions)  → 
 
 - The core is runner-independent: it accepts a neutral stream of test events and knows nothing about Playwright or Jest.
 - The Playwright reporter is a thin adapter that translates reporter steps into those events.
-- Renderers are pure: bundle in, output out. One shared view model walks the bundle once, and the text, Markdown, and HTML renderers each format that view, so they cannot drift apart. The CLI supplies screenshot bytes or links; adding an output format touches only a renderer.
+- Renderers are pure: bundle in, output out. One shared view model walks the bundle once, and the text, Markdown, and HTML renderers each format that view, so they cannot drift apart. The reporter and the CLI share one `BundleRenderer` that supplies screenshot bytes or links; adding an output format touches only a renderer.
 
-See [docs/design.md](./docs/design.md) and [ADR 0001](./docs/adr/0001-reporter-derived-qa-steps.md). Vocabulary is in [CONTEXT.md](./CONTEXT.md).
+See [docs/design.md](./docs/design.md), [ADR 0001](./docs/adr/0001-reporter-derived-qa-steps.md), and [ADR 0002](./docs/adr/0002-one-package-with-entry-points.md). Vocabulary is in [CONTEXT.md](./CONTEXT.md).
 
-## Packages
+## Package layout
 
-| Package                       | Role                                                                                              |
-| ----------------------------- | ------------------------------------------------------------------------------------------------- |
-| `@qa-instructions/core`       | Runner-independent core: test event port, QA Steps, bundle model, I/O, renderers                  |
-| `@qa-instructions/playwright` | Playwright reporter adapter (`@qa-instructions/playwright/reporter`); draws Highlights with sharp |
-| `@qa-instructions/cli`        | `qa-instructions render` command                                                                  |
+One published package, `@procyon-creative/qa-instructions` (`packages/qa-instructions`), with an entry point per role:
+
+| Entry point                                    | Source            | Role                                                                             |
+| ---------------------------------------------- | ----------------- | -------------------------------------------------------------------------------- |
+| `@procyon-creative/qa-instructions`            | `src/core/`       | Runner-independent core: test event port, QA Steps, bundle model, I/O, renderers |
+| `@procyon-creative/qa-instructions/playwright` | `src/playwright/` | Playwright reporter (default export); draws Highlights with sharp                |
+| `qa-instructions` command                      | `src/cli/`        | `qa-instructions render`                                                         |
+
+`src/core/` imports nothing from Playwright, sharp, or the folders beside it; ESLint enforces this.
 
 ## CI
 
@@ -259,7 +280,7 @@ All examples are unmodified Playwright tests with the reporter added to their co
 
 | Example                       | Purpose                                                                                                                                                                                  |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `examples/verification`       | Deterministic e2e: golden bundle and QA Steps for a test-id flow                                                                                                                         |
+| `examples/verification`       | Deterministic e2e: golden bundle and the QA Steps the reporter renders itself, for a test-id flow                                                                                        |
 | `examples/derived-steps`      | Role/label locators, helper functions, dropped test plumbing, and Step Screenshot and Highlight pixel probes (sticky header, hamburger menu, animated accordion; 1x and 2x; every style) |
 | `examples/derived-steps-1.56` | The derived-steps tests on Playwright 1.56: same QA Steps as 1.63, screen-recording screenshots with click points marked, missing-trace warning                                          |
 | `examples/basic`              | Optional smoke against playwright.dev                                                                                                                                                    |

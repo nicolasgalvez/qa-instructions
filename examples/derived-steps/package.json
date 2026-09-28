@@ -15,9 +15,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "@qa-instructions/cli": "workspace:*",
+    "@procyon-creative/qa-instructions": "workspace:*",
     "@qa-instructions/fixture-site": "workspace:*",
-    "@qa-instructions/playwright": "workspace:*",
     "pngjs": "^7.0.0"
   }
 }

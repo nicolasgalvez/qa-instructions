@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node scripts/sync-specs.mjs && playwright test",
-    "render": "node ../../packages/cli/dist/index.js render qa-runs --format qa-steps --out qa-steps-out",
+    "render": "node ../../packages/qa-instructions/dist/cli/index.js render qa-runs --format qa-steps --out qa-steps-out",
     "verify": "node scripts/verify-run.mjs",
     "verify:no-trace": "node scripts/verify-no-trace.mjs",
     "record-fixtures": "node scripts/record-fixtures.mjs",
@@ -12,9 +12,8 @@
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",
-    "@qa-instructions/cli": "workspace:*",
+    "@procyon-creative/qa-instructions": "workspace:*",
     "@qa-instructions/fixture-site": "workspace:*",
-    "@qa-instructions/playwright": "workspace:*",
     "sharp": "^0.35.4"
   }
 }

@@ -9,7 +9,7 @@ export default defineConfig(base, {
   reporter: [
     ['list'],
     [
-      '@qa-instructions/playwright/reporter',
+      '@procyon-creative/qa-instructions/playwright',
       { outputDir: 'qa-runs-selection', select: { tags: ['@qa'] } },
     ],
   ],
