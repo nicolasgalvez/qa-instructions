@@ -27,7 +27,7 @@
     "@types/pngjs": "^6.0.5",
     "htmlparser2": "^10.1.0",
     "pngjs": "^7.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^6.0.3"
   },
   "files": [
     "dist"
