@@ -1,6 +1,6 @@
 {
   "name": "@procyon-creative/qa-instructions",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Derives QA Instructions (steps a human tester follows, with screenshots) from Playwright test runs.",
   "author": "Procyon Creative Services",
   "license": "ISC",
