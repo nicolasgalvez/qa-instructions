@@ -21,6 +21,8 @@ The `protect` ruleset on `main` requires two status checks. A PR cannot merge un
 
 Neither workflow uses `paths-ignore` on `pull_request`. A required check that never reports leaves the PR blocked, so docs-only PRs must run both. Renaming a job's `name:` breaks its required check; update the ruleset in the same change.
 
+Release PRs are the exception to `pull_request` runs: release-please pushes them with the workflow token, which starts no workflows. `release-please.yml` therefore dispatches `ci.yml` and `e2e.yml` (`workflow_dispatch`) on the release branch after each release-please run, and their results report on the PR's head commit.
+
 ## Self-hosted on `ruby`
 
 Use the homelab runner on **`ruby`** when hosted Actions are not enough:
