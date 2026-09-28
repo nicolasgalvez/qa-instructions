@@ -9,6 +9,19 @@
     "url": "git+https://github.com/procyon-creative/qa-instructions.git",
     "directory": "packages/qa-instructions"
   },
+  "homepage": "https://github.com/procyon-creative/qa-instructions#readme",
+  "bugs": {
+    "url": "https://github.com/procyon-creative/qa-instructions/issues"
+  },
+  "keywords": [
+    "playwright",
+    "playwright-reporter",
+    "qa",
+    "manual-testing",
+    "test-steps",
+    "screenshots",
+    "reporter"
+  ],
   "type": "module",
   "exports": {
     ".": "./dist/core/index.js",

@@ -4,13 +4,10 @@ Turns what your existing Playwright tests already do into QA Instructions: steps
 
 ## Setup
 
-One package, `@procyon-creative/qa-instructions`, holds the Playwright reporter and the `qa-instructions` command. It is not on npm yet. Build a checkout, then install it into your project:
+One package, `@procyon-creative/qa-instructions`, holds the Playwright reporter and the `qa-instructions` command:
 
 ```bash
-git clone https://github.com/procyon-creative/qa-instructions
-cd qa-instructions && pnpm install && pnpm build
-cd ../your-project
-npm install -D file:../qa-instructions/packages/qa-instructions
+npm install -D @procyon-creative/qa-instructions
 ```
 
 Add the reporter, and the trace setting for Step Screenshots, to `playwright.config.ts`:
