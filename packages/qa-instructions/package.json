@@ -28,7 +28,7 @@
     "./playwright": "./dist/playwright/index.js"
   },
   "bin": {
-    "qa-instructions": "./dist/cli/index.js"
+    "qa-instructions": "dist/cli/index.js"
   },
   "engines": {
     "node": ">=18"
